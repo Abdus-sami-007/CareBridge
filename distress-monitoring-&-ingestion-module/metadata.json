@@ -1,0 +1,6 @@
+{
+  "name": "Distress Monitoring & Ingestion Module",
+  "description": "Multi-channel trauma ingestion, filtering, and distress prediction engine for Victims of Atrocities, providing dual data feeds for Victim and Officials dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
