@@ -122,7 +122,15 @@ npm start
 
 ## Updating the Database
 
-To connect an external database (PostgreSQL, Supabase, Neon, MongoDB, or Firestore):
-1. Review `src/db/databasePlaceholder.ts` and `SQL_SCHEMA_PLACEHOLDER`.
-2. Implement the `IDatabaseAdapter` interface.
-3. Pass your adapter using `setDatabaseAdapter(new MyCustomAdapter())`.
+### Neon REST API
+
+The app can connect to the supplied Neon PostgREST endpoint through the server-side `NeonRestAdapter`.
+
+1. Copy `.env.example` to `.env`.
+2. Set `NEON_API_URL` to your Neon REST endpoint and `NEON_API_KEY` to the Neon Data API key. `NEON_DATABASE_URL` remains supported as a legacy alias.
+3. Ensure the `victims` and `checkins` tables use the schemas above.
+4. Start the app with `npm run dev`.
+
+When either Neon environment variable is configured, the server uses Neon for the `victims` and `checkins` tables. Without them, it keeps the local in-memory adapter so the demo still runs. The API key is never sent to the browser.
+
+To connect another external database (PostgreSQL, MongoDB, or Firestore), implement `IDatabaseAdapter` and register it with `setDatabaseAdapter`.

@@ -16,10 +16,12 @@ import { executeBackendPipeline } from './src/lib/pipelineEngine.ts';
 import { getVictimDatabase } from './src/lib/victimDatabase.ts';
 import {
   getDatabaseAdapter,
+  setDatabaseAdapter,
   SQL_SCHEMA_PLACEHOLDER,
   MONGOOSE_SCHEMA_PLACEHOLDER,
   PRISMA_SCHEMA_PLACEHOLDER
 } from './src/db/databasePlaceholder.ts';
+import { isNeonRestConfigured, NeonRestAdapter } from './src/db/neonRestAdapter.ts';
 import type {
   FilterSettings,
   TraumaScores,
@@ -318,6 +320,11 @@ function seedInitialRecords() {
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  if (isNeonRestConfigured()) {
+    setDatabaseAdapter(new NeonRestAdapter());
+    console.log('[DatabaseAdapter] Neon REST adapter enabled');
+  }
 
   app.use(express.json({ limit: '10mb' }));
 

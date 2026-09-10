@@ -233,16 +233,22 @@ export class InMemoryVictimDatabase implements IVictimDatabase {
     for (const v of this.conversationVaults.values()) {
       totalTurns += v.length;
     }
-    const checkins = await getDatabaseAdapter().listCheckins(1000);
+    const adapter = getDatabaseAdapter();
+    const checkins = await adapter.listCheckins(1000);
+    const usesExternalAdapter = !adapter.name.includes('Placeholder');
 
     return {
-      name: 'Isolated In-Memory Victim Vault (Adapter Ready for External DB)',
-      type: 'in_memory_transient',
-      status: 'active',
+      name: usesExternalAdapter
+        ? `${adapter.name} + Isolated Victim Vault`
+        : 'Isolated In-Memory Victim Vault (Adapter Ready for External DB)',
+      type: usesExternalAdapter ? 'external_sql_nosql_ready' : 'in_memory_transient',
+      status: adapter.isConnected() ? 'active' : 'ready_for_external_injection',
       totalVictimsRegistered: this.profiles.size,
       totalIsolatedTurnsStored: totalTurns,
       totalCheckinsStored: checkins.length,
-      description: 'Strict per-victim conversation vault and telemetry store. Ready to be replaced by your external database adapter.'
+      description: usesExternalAdapter
+        ? 'Victim and check-in records use the configured external adapter; isolated conversation telemetry remains strictly scoped per victim.'
+        : 'Strict per-victim conversation vault and telemetry store. Ready to be replaced by your external database adapter.'
     };
   }
 }
