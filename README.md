@@ -95,6 +95,7 @@ console.log(result.pipelineStageResults.dynamicDistressScore);
 - `POST /api/database/victims` — Creates/updates a victim record (`id, name, case_id, risk_level, latest_score`).
 - `GET /api/database/checkins` — Queries check-ins (filter with `?victim_id=...`).
 - `POST /api/database/checkins` — Logs a check-in and auto-syncs the victim's latest score.
+- `GET /api/database/connection-test` — Verifies the active adapter can read the `victims` table.
 - `GET /api/database/schemas` — Returns SQL DDL, Mongoose, and Prisma schema definitions.
 
 ---

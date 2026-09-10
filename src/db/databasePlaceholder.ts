@@ -41,6 +41,17 @@ export interface IDatabaseAdapter {
   listCheckins(limit?: number): Promise<CheckinDbRecord[]>;
 }
 
+/** Exact PostgREST query formats used by NeonRestAdapter. */
+export const NEON_REST_QUERY_EXAMPLES = {
+  listVictims: 'GET /victims?select=id,name,case_id,risk_level,latest_score&order=latest_score.desc',
+  getVictim: 'GET /victims?id=eq.{victimId}&select=id,name,case_id,risk_level,latest_score&limit=1',
+  upsertVictim: 'POST /victims?on_conflict=id (Prefer: resolution=merge-duplicates,return=representation)',
+  updateVictimScore: 'PATCH /victims?id=eq.{victimId} (body: { risk_level, latest_score })',
+  listCheckins: 'GET /checkins?select=id,victim_id,message,score,risk_category,trigger_factors,created_at&order=created_at.desc&limit={limit}',
+  listVictimCheckins: 'GET /checkins?victim_id=eq.{victimId}&select=id,victim_id,message,score,risk_category,trigger_factors,created_at&order=created_at.desc&limit={limit}',
+  insertCheckin: 'POST /checkins (body: { id, victim_id, message, score, risk_category, trigger_factors, created_at })'
+} as const;
+
 /**
  * SQL DDL Placeholder Scripts for creating the tables in PostgreSQL, MySQL, or SQLite
  */

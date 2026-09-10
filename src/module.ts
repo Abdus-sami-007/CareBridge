@@ -43,6 +43,7 @@ export {
   SQL_SCHEMA_PLACEHOLDER,
   MONGOOSE_SCHEMA_PLACEHOLDER,
   PRISMA_SCHEMA_PLACEHOLDER,
+  NEON_REST_QUERY_EXAMPLES,
   type IDatabaseAdapter
 } from './db/databasePlaceholder';
 

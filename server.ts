@@ -19,7 +19,8 @@ import {
   setDatabaseAdapter,
   SQL_SCHEMA_PLACEHOLDER,
   MONGOOSE_SCHEMA_PLACEHOLDER,
-  PRISMA_SCHEMA_PLACEHOLDER
+  PRISMA_SCHEMA_PLACEHOLDER,
+  NEON_REST_QUERY_EXAMPLES
 } from './src/db/databasePlaceholder.ts';
 import { isNeonRestConfigured, NeonRestAdapter } from './src/db/neonRestAdapter.ts';
 import type {
@@ -319,7 +320,7 @@ function seedInitialRecords() {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   if (isNeonRestConfigured()) {
     setDatabaseAdapter(new NeonRestAdapter());
@@ -710,7 +711,8 @@ async function startServer() {
       res.json({
         ...meta,
         geminiApiKeyConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY',
-        instruction: 'In the next iteration, provide your database connection (e.g. Postgres / MongoDB / Firestore) to plug in via setVictimDatabaseAdapter.'
+        databaseApi: '/api/database',
+        connectionTest: '/api/database/connection-test'
       });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to fetch database status' });
@@ -769,6 +771,30 @@ async function startServer() {
       });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to retrieve victims from database' });
+    }
+  });
+
+  // Verify the active adapter can reach its configured database.
+  app.get('/api/database/connection-test', async (req, res) => {
+    try {
+      const db = getDatabaseAdapter();
+      await db.connect?.();
+      const victims = await db.listVictims();
+      res.json({
+        success: true,
+        adapter: db.name,
+        connected: db.isConnected(),
+        victimsReadable: true,
+        victimCount: victims.length,
+        queryExamples: NEON_REST_QUERY_EXAMPLES
+      });
+    } catch (err: any) {
+      res.status(503).json({
+        success: false,
+        adapter: getDatabaseAdapter().name,
+        connected: false,
+        error: err.message || 'Database connection test failed'
+      });
     }
   });
 
@@ -900,10 +926,15 @@ async function startServer() {
           schema: PRISMA_SCHEMA_PLACEHOLDER
         }
       },
+      neonRestApi: {
+        baseUrl: process.env.NEON_API_URL || process.env.NEON_DATABASE_URL || 'not configured',
+        queryExamples: NEON_REST_QUERY_EXAMPLES
+      },
       instructions: [
-        '1. In the next iteration, provide your DATABASE_URL (e.g., postgres://..., mongodb+srv://...)',
-        '2. Run the provided SQL DDL or Mongoose schema',
-        '3. The module automatically maps checkin scores and risk categories into victims (id, name, case_id, risk_level, latest_score) and checkins (id, victim_id, message, score, risk_category, trigger_factors, created_at).'
+        '1. Configure NEON_API_URL and NEON_API_KEY in the server .env file.',
+        '2. Create the victims and checkins tables using the PostgreSQL DDL above.',
+        '3. Verify the live adapter with GET /api/database/connection-test.',
+        '4. The pipeline writes check-ins and synchronizes the latest victim score through the active adapter.'
       ]
     });
   });
