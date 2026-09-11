@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  VictimDashboardPayload
+  VictimDashboardPayload,
+  VictimDbRecord,
+  PipelineExecutionResult
 } from '../types';
 import {
   Heart,
@@ -13,15 +15,24 @@ import {
   UserCheck,
   Wind
 } from 'lucide-react';
+import { VictimAiChat } from './VictimAiChat';
 
 interface VictimDashboardViewProps {
   payload: VictimDashboardPayload | null;
+  victims: VictimDbRecord[];
+  selectedVictimId: string;
+  onVictimChange: (victimId: string) => void;
+  onChatCompleted: (result: PipelineExecutionResult) => void;
   onRefresh: () => void;
   isLoading: boolean;
 }
 
 export const VictimDashboardView: React.FC<VictimDashboardViewProps> = ({
   payload,
+  victims,
+  selectedVictimId,
+  onVictimChange,
+  onChatCompleted,
   onRefresh,
   isLoading
 }) => {
@@ -70,6 +81,7 @@ export const VictimDashboardView: React.FC<VictimDashboardViewProps> = ({
 
   return (
     <div className="space-y-5">
+      <VictimAiChat victimId={selectedVictimId} onCompleted={onChatCompleted} />
       {/* Header & Endpoint Tag */}
       <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -85,6 +97,12 @@ export const VictimDashboardView: React.FC<VictimDashboardViewProps> = ({
               ID: {payload.victimId}
             </span>
           </h3>
+          <label className="mt-3 flex items-center gap-2 text-xs text-stone-500">
+            Victim record
+            <select value={selectedVictimId} onChange={event => onVictimChange(event.target.value)} className="rounded-lg border border-stone-200 bg-white px-2 py-1 font-mono text-[11px] text-stone-700">
+              {victims.map(victim => <option key={victim.id} value={victim.id}>{victim.name} ({victim.id})</option>)}
+            </select>
+          </label>
           <p className="text-xs text-stone-500">
             Dignifying, calm, and protective interface presented directly to the affected individual
           </p>

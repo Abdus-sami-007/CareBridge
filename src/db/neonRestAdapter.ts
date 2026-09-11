@@ -33,7 +33,7 @@ export class NeonRestAdapter implements IDatabaseAdapter {
 
   async getVictim(id: string): Promise<VictimDbRecord | null> {
     const rows = await this.request<VictimDbRecord[]>(
-      `victims?id=eq.${encodeURIComponent(id)}&select=id,name,case_id,risk_level,latest_score&limit=1`
+      `victims?id=eq.${encodeURIComponent(id)}&select=id,name,case_id,risk_level,latest_score,password_hash&limit=1`
     );
     return rows[0] || null;
   }

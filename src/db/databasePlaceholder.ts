@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS victims (
   name VARCHAR(255) NOT NULL,
   case_id VARCHAR(255) NOT NULL,
   risk_level VARCHAR(50) NOT NULL DEFAULT 'Low',
-  latest_score NUMERIC(5, 2) NOT NULL DEFAULT 0.0
+  latest_score NUMERIC(5, 2) NOT NULL DEFAULT 0.0,
+  password_hash TEXT
 );
 
 CREATE TABLE IF NOT EXISTS checkins (

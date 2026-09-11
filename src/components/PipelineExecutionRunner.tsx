@@ -36,42 +36,18 @@ export const PipelineExecutionRunner: React.FC<PipelineExecutionRunnerProps> = (
 }) => {
   const [modality, setModality] = useState<InputModality>('text');
   const [checkType, setCheckType] = useState<PipelineCheckType>('periodic_check');
-  const [inputText, setInputText] = useState(
-    'Periodic check response: I woke up again around 3am with severe heart racing and cold sweats. The artillery echoes keep playing in my ears. I am trying the deep breathing exercises Sarah gave me, but my hands still tremble when loud noises happen outside.'
-  );
+  const [inputText, setInputText] = useState('');
   const [voiceDistressRating, setVoiceDistressRating] = useState(7);
   const [copied, setCopied] = useState(false);
   const [lastResult, setLastResult] = useState<PipelineExecutionResult | null>(null);
-
-  // Preset scenarios to quickly test the pipeline
-  const loadScenario = (type: 'mild_periodic' | 'escalating_voice' | 'critical_crisis') => {
-    if (type === 'mild_periodic') {
-      setModality('text');
-      setCheckType('periodic_check');
-      setInputText(
-        'Periodic check-in: Today feels somewhat calmer. We received food supplies at the transit center. Still feeling hypervigilant in crowds, but slept 5 hours without nightmares.'
-      );
-    } else if (type === 'escalating_voice') {
-      setModality('voice');
-      setCheckType('direct_input');
-      setVoiceDistressRating(8);
-      setInputText(
-        'Voice note transcript (Duration 54s, vocal tremors detected): Patrol guards raided the next tent compound this morning. They took two young men away. I feel like we are going to be next. I cannot calm my chest down, my heart is pounding like it will explode.'
-      );
-    } else if (type === 'critical_crisis') {
-      setModality('events');
-      setCheckType('event_trigger');
-      setInputText(
-        'Emergency trigger alert: Direct artillery shelling hit the shelter annex at 04:00. Shell fragments breached our room. My neighbor was killed and I am covered in dust. I want to die, I cannot survive another night of this horror.'
-      );
-    }
-  };
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleRunPipeline = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputText.trim()) return;
 
     setIsLoading(true);
+    setErrorMessage(null);
     try {
       const payload: PipelineProcessPayload = {
         victimId: selectedVictimId,
@@ -96,6 +72,8 @@ export const PipelineExecutionRunner: React.FC<PipelineExecutionRunnerProps> = (
       setLastResult(result);
       onExecutionComplete(result);
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Pipeline execution failed.';
+      setErrorMessage(message);
       console.error('Execution error:', err);
     } finally {
       setIsLoading(false);
@@ -126,31 +104,6 @@ export const PipelineExecutionRunner: React.FC<PipelineExecutionRunnerProps> = (
           </div>
         </div>
 
-        {/* Quick Test Scenarios */}
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-stone-500 text-[10px]">Test Presets:</span>
-          <button
-            type="button"
-            onClick={() => loadScenario('mild_periodic')}
-            className="px-2 py-1 rounded bg-stone-900 border border-stone-800 hover:border-emerald-700 text-[11px] text-stone-300 transition-all cursor-pointer"
-          >
-            Periodic Check (Low)
-          </button>
-          <button
-            type="button"
-            onClick={() => loadScenario('escalating_voice')}
-            className="px-2 py-1 rounded bg-stone-900 border border-stone-800 hover:border-sky-700 text-[11px] text-stone-300 transition-all cursor-pointer"
-          >
-            Voice Note (Elevated)
-          </button>
-          <button
-            type="button"
-            onClick={() => loadScenario('critical_crisis')}
-            className="px-2 py-1 rounded bg-stone-900 border border-stone-800 hover:border-rose-700 text-[11px] text-rose-300 transition-all cursor-pointer"
-          >
-            Artillery Strike (Critical)
-          </button>
-        </div>
       </div>
 
       <form onSubmit={handleRunPipeline} className="space-y-3.5 text-xs">
@@ -291,6 +244,12 @@ export const PipelineExecutionRunner: React.FC<PipelineExecutionRunnerProps> = (
           </button>
         </div>
       </form>
+
+      {errorMessage && (
+        <div className="rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-xs text-rose-200" role="alert">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Live Pipeline Output Display */}
       {lastResult && (

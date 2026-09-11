@@ -2,8 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
+import net from 'node:net';
+import crypto from 'node:crypto';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import {
@@ -33,14 +34,42 @@ import type {
   PipelineProcessPayload,
   VictimProfile,
   VictimDbRecord,
-  CheckinDbRecord
+  CheckinDbRecord,
+  VictimDashboardPayload,
+  OfficialsDashboardPayload
 } from './src/types.ts';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // In-Memory Repository of Processed Atrocity Trauma Records
 const recordsStore: ProcessedAtrocityRecord[] = [];
+
+function hashVictimPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyVictimPassword(password: string, stored: string): boolean {
+  const [salt, expected] = stored.split(':');
+  if (!salt || !expected) return false;
+  const actual = crypto.scryptSync(password, salt, 64).toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
+}
+
+async function findAvailablePort(preferredPort: number): Promise<number> {
+  for (let port = preferredPort; port < preferredPort + 20; port += 1) {
+    const available = await new Promise<boolean>(resolve => {
+      const probe = net.createServer();
+      probe.once('error', () => resolve(false));
+      probe.listen(port, '0.0.0.0', () => {
+        probe.close(() => resolve(true));
+      });
+    });
+
+    if (available) return port;
+  }
+
+  throw new Error(`No available port found near ${preferredPort}`);
+}
 
 // Helper function to process an incoming text disclosure through the filter & AI scoring
 async function processDisclosure(
@@ -253,6 +282,39 @@ Return the structured assessment JSON.`;
   recordsStore.unshift(processedRecord);
   if (recordsStore.length > 100) recordsStore.pop();
 
+  // Keep every channel on the same durable database path as the backend pipeline.
+  const database = getDatabaseAdapter();
+  const databaseScore = scores.acuteDistressScore;
+  const databaseRisk = filterResult.crisisDetection.requiresImmediateHelp || databaseScore >= 75
+    ? 'Critical'
+    : scores.urgencyLevel === 'High' || databaseScore >= 55
+      ? 'High'
+      : databaseScore >= 35
+        ? 'Medium'
+        : 'Low';
+  await database.insertCheckin({
+    id: `CHK-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+    victim_id: victimId,
+    message: filterResult.filteredText,
+    score: databaseScore,
+    risk_category: databaseRisk,
+    trigger_factors: filterResult.traumaTags.map(tag => tag.label),
+    created_at: processedRecord.timestamp
+  });
+
+  const existingVictim = await database.getVictim(victimId);
+  if (existingVictim) {
+    await database.updateVictimScore(victimId, databaseRisk, databaseScore);
+  } else {
+    await database.upsertVictim({
+      id: victimId,
+      name: `Survivor ${victimId}`,
+      case_id: `CASE-${victimId.replace(/[^a-zA-Z0-9]/g, '')}`,
+      risk_level: databaseRisk,
+      latest_score: databaseScore
+    });
+  }
+
   return {
     filter: filterResult,
     scores,
@@ -264,63 +326,97 @@ Return the structured assessment JSON.`;
   };
 }
 
-// Seed initial representative records across channels so dashboards are immediately populated
-function seedInitialRecords() {
-  if (recordsStore.length > 0) return;
+async function getDatabaseVictimDashboard(victimId: string): Promise<VictimDashboardPayload | null> {
+  const db = getDatabaseAdapter();
+  const victim = await db.getVictim(victimId);
+  if (!victim) return null;
 
-  const samples = [
-    {
-      channel: 'whatsapp' as IngestionChannel,
-      victimId: 'VIC-WA-9042',
-      input: 'They shelled our residential quarter in district 4 near 220 Market Road yesterday night. My sister Leila Miller was injured by flying glass and our house is half collapsed. We are hiding in a cellar with no electricity and every explosion shakes the ground. I cannot breathe and my hands won’t stop trembling.',
-      metadata: { channel: 'whatsapp' as IngestionChannel, senderIdentifier: '+380-67-***-4921' }
-    },
-    {
-      channel: 'ivr' as IngestionChannel,
-      victimId: 'VIC-IVR-1180',
-      input: 'Caller transcript: I am calling from border transit camp Sector 7. Two men in uniforms stopped me at the river checkpoint, took my identity papers and threatened to shoot me if I moved. I haven’t slept in 4 days and I am terrified they are going to find my children.',
-      metadata: { channel: 'ivr' as IngestionChannel, senderIdentifier: 'HOTLINE-IVR-CALL-489', ivrDtmfTone: '9 (Urgent Crisis Pressed)', durationSeconds: 184 }
-    },
-    {
-      channel: 'telegram' as IngestionChannel,
-      victimId: 'VIC-TG-3301',
-      input: 'Telegram Bot SOS message: I was held in a detention facility for 14 days without charge. They kept the lights on 24 hours and beat my cellmates. Since getting released I feel numb and disconnected from my body. I want to live but the nightmares replay constantly.',
-      metadata: { channel: 'telegram' as IngestionChannel, senderIdentifier: '@user_anon_7749' }
-    }
-  ];
+  const checkins = await db.getCheckinsForVictim(victimId, 1);
+  const latestCheckin = checkins[0];
+  const score = latestCheckin?.score ?? victim.latest_score;
+  const status: VictimDashboardPayload['status'] = score >= 75 ? 'Needs Attention' : score >= 35 ? 'Supported' : 'Safe';
+  const plainTextDistressLevel: VictimDashboardPayload['plainTextDistressLevel'] =
+    score >= 75 ? 'Intense Overwhelm' : score >= 50 ? 'High Distress' : score >= 25 ? 'Mild Stress' : 'Balanced';
 
-  for (const s of samples) {
-    const filter = runTraumaFilter(s.input, {
-      redactPii: true,
-      redactLocations: true,
-      redactIdentifiers: true,
-      sensitivityLevel: 'standard',
-      includeCrisisSafetyShield: true
-    });
-    const scores = computeFallbackScores(filter);
-    const recordId = `REC-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    const victimDashboardData = generateVictimDashboardPayload(s.victimId, filter, scores);
-    const officialsDashboardData = generateOfficialsDashboardPayload(recordId, s.victimId, s.channel, filter, scores);
+  return {
+    victimId,
+    status,
+    compassionateGreeting: 'Welcome back. Your latest check-in has been securely recorded and is available to your support team.',
+    plainTextDistressLevel,
+    supportiveInsights: latestCheckin
+      ? [`Your latest recorded distress score is ${score}/100. Your support team can use this to guide the next check-in.`]
+      : ['No check-in has been recorded yet. Your support team is ready when you are.'],
+    dailyGroundingExercises: [
+      'Place both feet on the floor and name five things you can see around you.',
+      'Breathe in for four counts, hold for four, and breathe out for four.'
+    ],
+    privacyConfirmation: 'Your check-in is stored in the isolated database record for this victim ID.',
+    crisisContacts: [
+      { name: 'Emergency Lifeline (24/7)', contact: '988', description: 'Free, confidential crisis counseling by call or text' },
+      { name: 'Victim Advocacy Network', contact: '1-800-656-4673', description: 'Specialized assistance for victims of violence' }
+    ],
+    allocatedSupportWorker: `Assigned support team: ${victim.name}`,
+    lastUpdated: latestCheckin?.created_at || new Date().toISOString()
+  };
+}
 
-    recordsStore.push({
-      recordId,
-      victimId: s.victimId,
-      channel: s.channel,
-      channelMetadata: s.metadata,
-      rawInput: s.input,
-      filter,
-      scores,
-      victimDashboardData,
-      officialsDashboardData,
-      evalSource: 'clinical-rule-engine-fallback',
-      timestamp: new Date().toISOString()
-    });
-  }
+async function getDatabaseOfficialsFeed(): Promise<OfficialsDashboardPayload[]> {
+  const checkins = await getDatabaseAdapter().listCheckins(100);
+
+  return checkins.map(checkin => {
+    const score = checkin.score;
+    const isCritical = score >= 75 || checkin.risk_category === 'Critical';
+    const isElevated = !isCritical && (score >= 55 || checkin.risk_category === 'High');
+    const triagePriority: OfficialsDashboardPayload['triagePriority'] = isCritical
+      ? 'CRITICAL_RED'
+      : isElevated
+        ? 'ELEVATED_AMBER'
+        : score >= 35
+          ? 'MONITOR_YELLOW'
+          : 'STABLE_GREEN';
+    const escalationRisk: OfficialsDashboardPayload['escalationRisk'] = isCritical
+      ? 'Immediate Crisis'
+      : isElevated
+        ? 'High'
+        : score >= 35
+          ? 'Moderate'
+          : 'Low';
+
+    return {
+      recordId: checkin.id,
+      victimId: checkin.victim_id,
+      ingestionChannel: 'victim_dashboard',
+      triagePriority,
+      atrocityType: 'Database check-in',
+      traumaSeverityScore: score,
+      distressPredictionScore: score,
+      resilienceScore: Math.max(0, 100 - score),
+      escalationRisk,
+      sanitizedNarrative: checkin.message,
+      redactedTokensCount: 0,
+      crisisFlags: isCritical ? ['Database risk level requires immediate review'] : [],
+      recommendedOfficialProtocol: isCritical
+        ? 'IMMEDIATE ESCALATION: Review this case and contact the assigned protection team.'
+        : isElevated
+          ? 'PRIORITY OUTREACH: Assign a caseworker for follow-up.'
+          : 'SCHEDULED SUPPORT: Continue trauma-informed periodic check-ins.',
+      assignedAgency: 'Humanitarian Trauma & Casework Services',
+      timeline: [{ timestamp: checkin.created_at, action: 'Check-in loaded from database', actor: 'Database Adapter' }],
+      ingestedAt: checkin.created_at
+    };
+  });
 }
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT || 3000);
+  const preferredPort = Number(process.env.PORT || 3000);
+  const PORT = await findAvailablePort(preferredPort);
+  const runningCompiledServer = path.basename(path.dirname(process.argv[1] || '')) === 'dist';
+  const isProduction = process.env.NODE_ENV === 'production' || runningCompiledServer;
+
+  if (PORT !== preferredPort) {
+    console.warn(`[CareBridge] Port ${preferredPort} is busy; using port ${PORT}.`);
+  }
 
   if (isNeonRestConfigured()) {
     setDatabaseAdapter(new NeonRestAdapter());
@@ -328,8 +424,6 @@ async function startServer() {
   }
 
   app.use(express.json({ limit: '10mb' }));
-
-  seedInitialRecords();
 
   // 1. Health check & System info
   app.get('/api/health', (req, res) => {
@@ -432,7 +526,17 @@ async function startServer() {
       }
 
       const senderId = msg.from?.id ? String(msg.from.id) : 'anon_tg';
-      const vId = `VIC-TG-${senderId.slice(-4)}`;
+      let vId = req.body.victimId as string | undefined;
+      if (!vId && req.body.victimName) {
+        const victims = await getDatabaseAdapter().listVictims();
+        const match = victims.find(victim => victim.name.trim().toLowerCase() === String(req.body.victimName).trim().toLowerCase());
+        if (!match) {
+          res.status(404).json({ error: 'No victim record matches that name' });
+          return;
+        }
+        vId = match.id;
+      }
+      vId = vId || `VIC-TG-${senderId.slice(-4)}`;
       const result = await processDisclosure(content, 'telegram', vId, {
         channel: 'telegram',
         senderIdentifier: msg.from?.username ? `@${msg.from.username}` : `TG_USER_${senderId.slice(-4)}`,
@@ -520,42 +624,55 @@ async function startServer() {
   });
 
   // 9. Data Feed for Victim Dashboard
-  app.get('/api/dashboards/victim/latest', (req, res) => {
-    if (recordsStore.length === 0) {
-      res.status(404).json({ message: 'No records available for victim dashboard' });
-      return;
+  app.get('/api/dashboards/victim/latest', async (req, res) => {
+    try {
+      const latestCheckins = await getDatabaseAdapter().listCheckins(1);
+      const latestCheckin = latestCheckins[0];
+      if (!latestCheckin) {
+        res.status(404).json({ message: 'No database check-ins available for victim dashboard' });
+        return;
+      }
+      const payload = await getDatabaseVictimDashboard(latestCheckin.victim_id);
+      if (!payload) {
+        res.status(404).json({ message: 'No database victim record available for victim dashboard' });
+        return;
+      }
+      res.json(payload);
+    } catch {
+      res.status(500).json({ error: 'Failed to load latest victim dashboard from database' });
     }
-    res.json(recordsStore[0].victimDashboardData);
   });
 
-  app.get('/api/dashboards/victim/:victimId', (req, res) => {
-    const record = recordsStore.find(r => r.victimId.toLowerCase() === req.params.victimId.toLowerCase());
-    if (!record) {
-      res.status(404).json({ error: `No data found for victim ID: ${req.params.victimId}` });
-      return;
+  app.get('/api/dashboards/victim/:victimId', async (req, res) => {
+    try {
+      const payload = await getDatabaseVictimDashboard(req.params.victimId);
+      if (!payload) {
+        res.status(404).json({ error: `No database record found for victim ID: ${req.params.victimId}` });
+        return;
+      }
+      res.json(payload);
+    } catch {
+      res.status(500).json({ error: 'Failed to load victim dashboard from database' });
     }
-    res.json(record.victimDashboardData);
   });
 
   // 10. Data Feed for Officials & Clinicians Dashboard
-  app.get('/api/dashboards/officials', (req, res) => {
-    const triageSummary = {
-      totalMonitoredVictims: recordsStore.length,
-      criticalRedCount: recordsStore.filter(r => r.officialsDashboardData.triagePriority === 'CRITICAL_RED').length,
-      elevatedAmberCount: recordsStore.filter(r => r.officialsDashboardData.triagePriority === 'ELEVATED_AMBER').length,
-      monitorYellowCount: recordsStore.filter(r => r.officialsDashboardData.triagePriority === 'MONITOR_YELLOW').length,
-      stableGreenCount: recordsStore.filter(r => r.officialsDashboardData.triagePriority === 'STABLE_GREEN').length,
-      byChannel: {
-        victim_dashboard: recordsStore.filter(r => r.channel === 'victim_dashboard').length,
-        whatsapp: recordsStore.filter(r => r.channel === 'whatsapp').length,
-        telegram: recordsStore.filter(r => r.channel === 'telegram').length,
-        ivr: recordsStore.filter(r => r.channel === 'ivr').length,
-        speech: recordsStore.filter(r => r.channel === 'speech').length
-      },
-      records: recordsStore.map(r => r.officialsDashboardData),
-      lastUpdated: new Date().toISOString()
-    };
-    res.json(triageSummary);
+  app.get('/api/dashboards/officials', async (req, res) => {
+    try {
+      const records = await getDatabaseOfficialsFeed();
+      res.json({
+        totalMonitoredVictims: new Set(records.map(record => record.victimId)).size,
+        criticalRedCount: records.filter(record => record.triagePriority === 'CRITICAL_RED').length,
+        elevatedAmberCount: records.filter(record => record.triagePriority === 'ELEVATED_AMBER').length,
+        monitorYellowCount: records.filter(record => record.triagePriority === 'MONITOR_YELLOW').length,
+        stableGreenCount: records.filter(record => record.triagePriority === 'STABLE_GREEN').length,
+        byChannel: { victim_dashboard: records.length, whatsapp: 0, telegram: 0, ivr: 0, speech: 0 },
+        records,
+        lastUpdated: new Date().toISOString()
+      });
+    } catch {
+      res.status(500).json({ error: 'Failed to load officials dashboard from database' });
+    }
   });
 
   // 11. All Records Endpoint (Full Audit Data)
@@ -597,7 +714,11 @@ async function startServer() {
         res.status(400).json({ error: 'victimId is required for periodic check' });
         return;
       }
-      const input = simulatedResponse || checkPrompt || 'Periodic check-in response: Feeling high anxiety and trouble sleeping after recent alarms.';
+      const input = simulatedResponse || checkPrompt;
+      if (!input || typeof input !== 'string' || !input.trim()) {
+        res.status(400).json({ error: 'A real check-in response is required' });
+        return;
+      }
       const result = await executeBackendPipeline({
         victimId,
         modality: modality || 'text',
@@ -798,6 +919,28 @@ async function startServer() {
     }
   });
 
+  app.get('/api/database/victims/resolve', async (req, res) => {
+    try {
+      const name = String(req.query.name || '').trim().toLowerCase();
+      if (!name) {
+        res.status(400).json({ error: 'name is required' });
+        return;
+      }
+      const matches = (await getDatabaseAdapter().listVictims()).filter(victim => victim.name.trim().toLowerCase() === name);
+      if (matches.length === 0) {
+        res.status(404).json({ error: 'No victim record matches that name' });
+        return;
+      }
+      if (matches.length > 1) {
+        res.status(409).json({ error: 'Multiple victim records match that name', victims: matches });
+        return;
+      }
+      res.json({ victim: matches[0] });
+    } catch {
+      res.status(500).json({ error: 'Failed to resolve victim name' });
+    }
+  });
+
   // Get specific victim by id
   app.get('/api/database/victims/:id', async (req, res) => {
     try {
@@ -807,9 +950,10 @@ async function startServer() {
         res.status(404).json({ error: `Victim record with id '${req.params.id}' not found` });
         return;
       }
+      const { password_hash: _passwordHash, ...safeVictim } = victim;
       res.json({
         table: 'victims',
-        victim
+        victim: safeVictim
       });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to fetch victim record' });
@@ -819,11 +963,15 @@ async function startServer() {
   // Create or update a victim record
   app.post('/api/database/victims', async (req, res) => {
     try {
-      const { id, name, case_id, risk_level, latest_score } = req.body;
+      const { id, name, case_id, risk_level, latest_score, password } = req.body;
       if (!id || !name || !case_id) {
         res.status(400).json({
           error: 'Missing required victim fields. Required: id, name, case_id. Optional: risk_level, latest_score'
         });
+        return;
+      }
+      if (typeof password !== 'string' || password.length < 8) {
+        res.status(400).json({ error: 'A password of at least 8 characters is required.' });
         return;
       }
       const record: VictimDbRecord = {
@@ -832,6 +980,7 @@ async function startServer() {
         case_id,
         risk_level: risk_level || 'Low',
         latest_score: typeof latest_score === 'number' ? latest_score : 0
+        ,password_hash: hashVictimPassword(password)
       };
       const db = getDatabaseAdapter();
       const saved = await db.upsertVictim(record);
@@ -842,6 +991,25 @@ async function startServer() {
       });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to save victim to database' });
+    }
+  });
+
+  app.post('/api/victim-auth/login', async (req, res) => {
+    try {
+      const { victimId, name, password } = req.body;
+      if (!victimId || !name || !password) {
+        res.status(400).json({ error: 'Victim ID, name, and password are required.' });
+        return;
+      }
+      const victim = await getDatabaseAdapter().getVictim(String(victimId));
+      if (!victim || victim.name.trim().toLowerCase() !== String(name).trim().toLowerCase() || !victim.password_hash || !verifyVictimPassword(String(password), victim.password_hash)) {
+        res.status(401).json({ error: 'Victim validation failed.' });
+        return;
+      }
+      const { password_hash: _passwordHash, ...safeVictim } = victim;
+      res.json({ success: true, victim: safeVictim });
+    } catch {
+      res.status(500).json({ error: 'Victim validation failed.' });
     }
   });
 
@@ -940,9 +1108,9 @@ async function startServer() {
   });
 
   // Vite middleware in dev, static file server in prod
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProduction) {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -955,7 +1123,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Atrocity Mental Health Distress Prediction Module] Server online at http://0.0.0.0:${PORT}`);
+    console.log(`[Atrocity Mental Health Distress Prediction Module] Server online at http://localhost:${PORT}`);
   });
 }
 

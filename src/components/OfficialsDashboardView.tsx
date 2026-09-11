@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   OfficialsDashboardPayload,
   IngestionChannel
@@ -33,6 +33,10 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
 }) => {
   const [selectedRecord, setSelectedRecord] = useState<OfficialsDashboardPayload | null>(records[0] || null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setSelectedRecord(records[0] || null);
+  }, [records]);
 
   // Computed metrics
   const criticalCount = records.filter(r => r.triagePriority === 'CRITICAL_RED').length;
@@ -165,7 +169,11 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
           </div>
 
           <div className="divide-y divide-stone-200 max-h-[600px] overflow-y-auto">
-            {records.map((rec) => {
+            {records.length === 0 ? (
+              <div className="p-8 text-center text-xs text-stone-500">
+                No processed cases are available yet. Submit a real check-in through the pipeline to populate this queue.
+              </div>
+            ) : records.map((rec) => {
               const isSelected = selectedRecord?.recordId === rec.recordId;
               return (
                 <div

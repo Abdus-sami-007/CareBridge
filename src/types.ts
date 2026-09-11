@@ -218,6 +218,7 @@ export interface VictimDbRecord {
   case_id: string;
   risk_level: RiskLevel | string;
   latest_score: number; // 0 - 100
+  password_hash?: string;
 }
 
 /**

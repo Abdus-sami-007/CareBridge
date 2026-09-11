@@ -29,9 +29,17 @@ CREATE TABLE IF NOT EXISTS victims (
   name VARCHAR(255) NOT NULL,
   case_id VARCHAR(255) NOT NULL,
   risk_level VARCHAR(50) NOT NULL DEFAULT 'Low', -- 'Low' | 'Medium' | 'High' | 'Critical'
-  latest_score NUMERIC(5, 2) NOT NULL DEFAULT 0.0 -- 0.0 to 100.0
+  latest_score NUMERIC(5, 2) NOT NULL DEFAULT 0.0, -- 0.0 to 100.0
+  password_hash TEXT
 );
 ```
+
+For an existing Neon database, run this migration once:
+```sql
+ALTER TABLE victims ADD COLUMN IF NOT EXISTS password_hash TEXT;
+```
+
+CareBridge never stores victim passwords in plaintext. Officials assign a password when creating a victim record; the server stores a scrypt hash and validates the victim's ID, name, and password before opening the Victim Dashboard.
 
 ### 2. `checkins` Table
 Stores chronological check-in interactions and distress evaluations.
@@ -135,3 +143,15 @@ The app can connect to the supplied Neon PostgREST endpoint through the server-s
 When either Neon environment variable is configured, the server uses Neon for the `victims` and `checkins` tables. Without them, it keeps the local in-memory adapter so the demo still runs. The API key is never sent to the browser.
 
 To connect another external database (PostgreSQL, MongoDB, or Firestore), implement `IDatabaseAdapter` and register it with `setDatabaseAdapter`.
+
+### Telegram Check-in Bot
+
+The optional `checkin_bot.py` forwards Telegram text and voice check-ins to the existing CareBridge pipeline. It does not score messages or write to the database directly.
+
+1. Install Python dependencies with `pip install -r requirements.txt`.
+2. Set `BOT_TOKEN` and `CAREBRIDGE_API_URL` in `.env`.
+3. Start CareBridge with `npm run dev` or the production server.
+4. Run `python checkin_bot.py`.
+5. Use `/start CASE_ID` in Telegram to link the chat to an existing victim record. Without a case ID, the bot uses a stable `VIC-TG-<chat suffix>` identity.
+
+Text and transcribed voice messages are sent to `POST /api/ingest/telegram`, then sanitized, scored, persisted as check-ins, and returned as the victim reply. Set `OPENAI_API_KEY` only when voice transcription is required.

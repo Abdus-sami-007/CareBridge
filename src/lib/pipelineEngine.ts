@@ -383,7 +383,7 @@ CRISIS FLAGS: ${filterResult.crisisDetection.reasons.join('; ') || 'None'}`;
   const checkinRecord: CheckinDbRecord = {
     id: `CHK-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
     victim_id: victimId,
-    message: payload.input,
+    message: filterResult.filteredText,
     score: dynamicDistressScore,
     risk_category: riskClassification.classification,
     trigger_factors: nlpCategories.length > 0 ? nlpCategories : ['trauma_exposure', 'wellness_check'],
