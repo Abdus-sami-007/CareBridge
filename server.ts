@@ -1404,7 +1404,21 @@ async function startServer() {
       ]
     });
   });
+// -------------------------------------------------------------------------
+// API 404 HANDLER
+// Never allow an unknown /api/* request to fall through to the SPA.
+// Otherwise the frontend receives index.html and JSON parsing fails.
+// -------------------------------------------------------------------------
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: 'API endpoint not found',
+    method: req.method,
+    path: req.path
+  });
+});
 
+// Vite middleware in dev, static file server in prod
+if (!isProduction) {
   // Vite middleware in dev, static file server in prod
   if (!isProduction) {
     const vite = await createViteServer({
