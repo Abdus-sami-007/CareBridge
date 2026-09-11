@@ -44,7 +44,49 @@ export default function App() {
       .then(data => setServerMeta(data))
       .catch(err => console.warn('Health check fetch error:', err));
   }, []);
+async function fetchJson<T>(
+  url: string,
+  options?: RequestInit
+): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options?.headers || {}),
+    },
+    cache: 'no-store',
+  });
 
+  const contentType = response.headers.get('content-type') || '';
+
+  if (!contentType.toLowerCase().includes('application/json')) {
+    const text = await response.text();
+
+    console.error(
+      `[API] ${url} returned non-JSON response:`,
+      response.status,
+      text.substring(0, 300)
+    );
+
+    throw new Error(
+      response.status === 404
+        ? `API endpoint not found: ${url}`
+        : `Server returned an invalid response for ${url}`
+    );
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      typeof data?.error === 'string'
+        ? data.error
+        : `Request failed: ${response.status}`
+    );
+  }
+
+  return data as T;
+}
   const loadVictims = async () => {
   try {
     setDashboardError(null);
