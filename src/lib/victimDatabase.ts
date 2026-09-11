@@ -3,6 +3,7 @@ import {
   IsolatedConversationTurn,
   DynamicDistressRecord,
   InputModality,
+  IngestionChannel,
   PipelineCheckType,
   VictimDbRecord,
   CheckinDbRecord,
@@ -57,17 +58,10 @@ export interface IVictimDatabase {
 }
 
 /**
- * In-Memory Isolated Database implementation.
+ * Database-backed victim repository.
  * Ensures zero cross-contamination between victims.
  */
 export class InMemoryVictimDatabase implements IVictimDatabase {
-  private profiles = new Map<string, VictimProfile>();
-  private conversationVaults = new Map<string, IsolatedConversationTurn[]>();
-  private distressHistories = new Map<string, DynamicDistressRecord[]>();
-
-  constructor() {
-    this.seedInitialVictims();
-  }
 
   // =========================================================================
   // EXPLICIT SCHEMA IMPLEMENTATION: victims (id, name, case_id, risk_level, latest_score)
@@ -103,152 +97,119 @@ export class InMemoryVictimDatabase implements IVictimDatabase {
     return getDatabaseAdapter().listCheckins(limit);
   }
 
-  private seedInitialVictims() {
-    const seedProfiles: VictimProfile[] = [
-      {
-        victimId: 'VIC-CONFLICT-701',
-        pseudonym: 'Survivor-Kharkiv-01',
-        demographics: { ageRange: '35-45', region: 'Sector North', language: 'Ukrainian' },
-        traumaContext: 'Severe artillery shelling of residential district; lost home; displaced with child.',
-        baselineDistressScore: 42,
-        assignedAgency: 'International Medical Corps & Humanitarian Trauma Hub',
-        assignedCaseworker: 'Dr. Anna M. (Trauma Clinician)',
-        safetyNotes: 'High hyperarousal near loud percussive sounds. Relatives safe.',
-        status: 'active',
-        createdAt: '2026-09-01T08:00:00.000Z',
-        updatedAt: '2026-09-08T14:30:00.000Z'
-      },
-      {
-        victimId: 'VIC-DETENTION-802',
-        pseudonym: 'Survivor-Cell-14',
-        demographics: { ageRange: '25-34', region: 'Sector East', language: 'English / Arabic' },
-        traumaContext: 'Detained arbitrarily for 21 days; sensory deprivation and sleep deprivation.',
-        baselineDistressScore: 58,
-        assignedAgency: 'Torture Rehabilitation & Legal Defense Center',
-        assignedCaseworker: 'Tariq K. (Protection Officer)',
-        safetyNotes: 'Experiences severe dissociative episodes upon sudden light changes.',
-        status: 'active',
-        createdAt: '2026-09-02T10:15:00.000Z',
-        updatedAt: '2026-09-08T18:00:00.000Z'
-      },
-      {
-        victimId: 'VIC-BORDER-903',
-        pseudonym: 'Survivor-Transit-88',
-        demographics: { ageRange: '45-55', region: 'Border Transit Camp 4', language: 'French' },
-        traumaContext: 'Border crossing interdiction; documents confiscated by armed militia.',
-        baselineDistressScore: 61,
-        assignedAgency: 'UNHCR Rapid Protection Casework',
-        assignedCaseworker: 'Claire B. (Field Social Worker)',
-        safetyNotes: 'At risk of severe anxiety and despair regarding separated minor children.',
-        status: 'active',
-        createdAt: '2026-09-03T12:00:00.000Z',
-        updatedAt: '2026-09-09T06:00:00.000Z'
-      }
-    ];
-
-    for (const p of seedProfiles) {
-      this.profiles.set(p.victimId, p);
-      this.conversationVaults.set(p.victimId, []);
-      this.distressHistories.set(p.victimId, [
-        {
-          recordId: `INIT-SCORE-${p.victimId}`,
-          victimId: p.victimId,
-          timestamp: p.createdAt,
-          dynamicDistressScore: p.baselineDistressScore,
-          acuteArousalScore: Math.max(20, p.baselineDistressScore - 10),
-          traumaSeverityScore: p.baselineDistressScore + 5,
-          resilienceScore: 40,
-          modality: 'text',
-          source: 'periodic_check'
-        }
-      ]);
-    }
-  }
 
   async getVictimProfile(victimId: string): Promise<VictimProfile | null> {
-    const profile = this.profiles.get(victimId);
-    if (!profile) return null;
-    return { ...profile };
+    const record = await getDatabaseAdapter().getVictim(victimId);
+    if (!record) return null;
+    return {
+      victimId: record.id,
+      pseudonym: record.name,
+      demographics: {},
+      traumaContext: 'Protected case record; detailed context is supplied only through the current check-in pipeline.',
+      baselineDistressScore: Number(record.doctor_initial_score ?? (Number(record.baseline_distress_score || 0) > 0 ? record.baseline_distress_score : record.latest_score)),
+      assignedAgency: 'Humanitarian Trauma & Casework Services',
+      assignedCaseworker: 'Assigned Protection Caseworker',
+      safetyNotes: '',
+      status: record.risk_level === 'Critical' || record.risk_level === 'High' ? 'escalated' : 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
   }
 
   async saveVictimProfile(profile: VictimProfile): Promise<void> {
-    const now = new Date().toISOString();
-    this.profiles.set(profile.victimId, {
-      ...profile,
-      updatedAt: now
+    const existing = await getDatabaseAdapter().getVictim(profile.victimId);
+    await getDatabaseAdapter().upsertVictim({
+      id: profile.victimId,
+      name: existing?.name || profile.pseudonym,
+      case_id: existing?.case_id || `CASE-${profile.victimId.replace(/[^a-zA-Z0-9]/g, '')}`,
+      risk_level: existing?.risk_level || 'Low',
+      latest_score: existing?.latest_score ?? profile.baselineDistressScore,
+      baseline_distress_score: existing?.baseline_distress_score ?? profile.baselineDistressScore,
+      doctor_initial_score: existing?.doctor_initial_score ?? profile.baselineDistressScore,
+      doctor_name: existing?.doctor_name ?? null,
+      doctor_notes: existing?.doctor_notes ?? null,
+      closed: existing?.closed ?? false,
+      closed_at: existing?.closed_at ?? null,
+      closed_by: existing?.closed_by ?? null,
+      password_hash: existing?.password_hash
     });
-    if (!this.conversationVaults.has(profile.victimId)) {
-      this.conversationVaults.set(profile.victimId, []);
-    }
-    if (!this.distressHistories.has(profile.victimId)) {
-      this.distressHistories.set(profile.victimId, []);
-    }
   }
 
   async listVictimProfiles(): Promise<VictimProfile[]> {
-    return Array.from(this.profiles.values());
+    const records = await getDatabaseAdapter().listVictims();
+    return records.map(record => ({
+      victimId: record.id,
+      pseudonym: record.name,
+      demographics: {},
+      traumaContext: 'Protected case record; detailed context is supplied only through the current check-in pipeline.',
+      baselineDistressScore: Number(record.doctor_initial_score ?? (Number(record.baseline_distress_score || 0) > 0 ? record.baseline_distress_score : record.latest_score)),
+      assignedAgency: 'Humanitarian Trauma & Casework Services',
+      assignedCaseworker: 'Assigned Protection Caseworker',
+      safetyNotes: '',
+      status: record.risk_level === 'Critical' || record.risk_level === 'High' ? 'escalated' : 'active',
+      createdAt: '',
+      updatedAt: ''
+    }));
   }
 
   async getIsolatedConversations(victimId: string, limit = 50): Promise<IsolatedConversationTurn[]> {
-    const vault = this.conversationVaults.get(victimId) || [];
-    // Strict isolation: only returns records matching this victimId
-    return vault.slice(-limit).map(t => ({ ...t }));
+    const checkins = await getDatabaseAdapter().getCheckinsForVictim(victimId, limit);
+    return checkins.reverse().map(checkin => ({
+      turnId: checkin.id,
+      victimId: checkin.victim_id,
+      role: 'victim' as const,
+      channel: (checkin.ingestion_channel || 'victim_dashboard') as IngestionChannel,
+      rawMessage: checkin.message,
+      sanitizedMessage: checkin.message,
+      detectedEmotion: 'Distress',
+      emotionalValence: 'distressed' as const,
+      distressScore: checkin.score,
+      timestamp: checkin.created_at
+    }));
   }
 
-  async appendIsolatedConversationTurn(turn: IsolatedConversationTurn): Promise<void> {
-    let vault = this.conversationVaults.get(turn.victimId);
-    if (!vault) {
-      vault = [];
-      this.conversationVaults.set(turn.victimId, vault);
-    }
-    vault.push({ ...turn });
-    if (vault.length > 200) {
-      vault.shift();
-    }
+  async appendIsolatedConversationTurn(_turn: IsolatedConversationTurn): Promise<void> {
+    // Durable conversation persistence is performed by recordCheckin() in the pipeline.
+    // Keeping this method side-effect free prevents a second copy of the same turn.
   }
 
-  async clearIsolatedConversations(victimId: string): Promise<void> {
-    this.conversationVaults.set(victimId, []);
+  async clearIsolatedConversations(_victimId: string): Promise<void> {
+    throw new Error('Conversation deletion is intentionally disabled; use the database retention policy.');
   }
 
   async getDistressHistory(victimId: string): Promise<DynamicDistressRecord[]> {
-    const history = this.distressHistories.get(victimId) || [];
-    return history.map(h => ({ ...h }));
+    const checkins = await getDatabaseAdapter().getCheckinsForVictim(victimId, 100);
+    return checkins.reverse().map(checkin => ({
+      recordId: checkin.id,
+      victimId: checkin.victim_id,
+      timestamp: checkin.created_at,
+      dynamicDistressScore: checkin.score,
+      acuteArousalScore: checkin.score,
+      traumaSeverityScore: checkin.score,
+      resilienceScore: Math.max(0, 100 - checkin.score),
+      modality: 'text' as InputModality,
+      source: 'periodic_check' as PipelineCheckType
+    }));
   }
 
-  async saveDistressRecord(record: DynamicDistressRecord): Promise<void> {
-    let history = this.distressHistories.get(record.victimId);
-    if (!history) {
-      history = [];
-      this.distressHistories.set(record.victimId, history);
-    }
-    history.push({ ...record });
-    if (history.length > 100) {
-      history.shift();
-    }
+  async saveDistressRecord(_record: DynamicDistressRecord): Promise<void> {
+    // Distress history is derived from durable check-in rows, avoiding a second transient store.
   }
 
   async getAdapterMeta(): Promise<DatabaseAdapterMeta> {
-    let totalTurns = 0;
-    for (const v of this.conversationVaults.values()) {
-      totalTurns += v.length;
-    }
     const adapter = getDatabaseAdapter();
-    const checkins = await adapter.listCheckins(1000);
-    const usesExternalAdapter = !adapter.name.includes('Placeholder');
-
+    const [victims, checkins] = await Promise.all([
+      adapter.listVictims(),
+      adapter.listCheckins(1000)
+    ]);
     return {
-      name: usesExternalAdapter
-        ? `${adapter.name} + Isolated Victim Vault`
-        : 'Isolated In-Memory Victim Vault (Adapter Ready for External DB)',
-      type: usesExternalAdapter ? 'external_sql_nosql_ready' : 'in_memory_transient',
+      name: adapter.name,
+      type: 'external_sql_nosql_ready',
       status: adapter.isConnected() ? 'active' : 'ready_for_external_injection',
-      totalVictimsRegistered: this.profiles.size,
-      totalIsolatedTurnsStored: totalTurns,
+      totalVictimsRegistered: victims.length,
+      totalIsolatedTurnsStored: checkins.length,
       totalCheckinsStored: checkins.length,
-      description: usesExternalAdapter
-        ? 'Victim and check-in records use the configured external adapter; isolated conversation telemetry remains strictly scoped per victim.'
-        : 'Strict per-victim conversation vault and telemetry store. Ready to be replaced by your external database adapter.'
+      description: 'All victim records, check-ins, conversation history and distress history are read from the configured database. No seed or in-memory sample data is used.'
     };
   }
 }

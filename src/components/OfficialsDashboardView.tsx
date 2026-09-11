@@ -17,32 +17,55 @@ import {
   Copy,
   Check,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  BarChart3,
+  Users,
+  Activity,
+  ShieldAlert,
+  TrendingUp,
+  XCircle
 } from 'lucide-react';
 
 interface OfficialsDashboardViewProps {
   records: OfficialsDashboardPayload[];
   onRefresh: () => void;
   isLoading: boolean;
+  authToken?: string;
 }
 
 export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
   records,
   onRefresh,
-  isLoading
+  isLoading,
+  authToken
 }) => {
   const [selectedRecord, setSelectedRecord] = useState<OfficialsDashboardPayload | null>(records[0] || null);
   const [copied, setCopied] = useState(false);
+  const [caseAnalysis, setCaseAnalysis] = useState<any>(null);
 
   useEffect(() => {
     setSelectedRecord(records[0] || null);
   }, [records]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedRecord?.victimId) { setCaseAnalysis(null); return; }
+    fetch(`/api/analysis/victim/${encodeURIComponent(selectedRecord.victimId)}`)
+      .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Unable to load case analysis'); return d; })
+      .then(d => { if (!cancelled) setCaseAnalysis(d); })
+      .catch(() => { if (!cancelled) setCaseAnalysis(null); });
+    return () => { cancelled = true; };
+  }, [selectedRecord?.victimId, selectedRecord?.recordId]);
 
   // Computed metrics
   const criticalCount = records.filter(r => r.triagePriority === 'CRITICAL_RED').length;
   const amberCount = records.filter(r => r.triagePriority === 'ELEVATED_AMBER').length;
   const yellowCount = records.filter(r => r.triagePriority === 'MONITOR_YELLOW').length;
   const greenCount = records.filter(r => r.triagePriority === 'STABLE_GREEN').length;
+  const monitoredVictims = new Set(records.map(r => r.victimId)).size;
+  const averageDistress = records.length ? Math.round(records.reduce((sum, r) => sum + Number(r.distressPredictionScore || 0), 0) / records.length) : 0;
+  const highRiskShare = records.length ? Math.round(((criticalCount + amberCount) / records.length) * 100) : 0;
+  const sortedRecent = [...records].sort((a, b) => new Date(b.ingestedAt).getTime() - new Date(a.ingestedAt).getTime()).slice(0, 8).reverse();
 
   const handleCopyJson = () => {
     navigator.clipboard.writeText(JSON.stringify(records, null, 2));
@@ -126,6 +149,54 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? 'Copied Officials JSON' : 'Export Officials Feed (JSON)'}</span>
             </button>
+          </div>
+        </div>
+
+        {/* Analysis & operational statistics */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="rounded-xl border border-sky-200 bg-sky-50 p-3.5">
+            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-sky-700">Monitored victims</span><Users className="h-4 w-4 text-sky-600" /></div>
+            <div className="mt-1 text-2xl font-bold text-sky-950">{monitoredVictims}</div>
+            <div className="text-[10px] text-sky-700">Unique database cases</div>
+          </div>
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3.5">
+            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Avg distress</span><Activity className="h-4 w-4 text-indigo-600" /></div>
+            <div className="mt-1 text-2xl font-bold text-indigo-950">{averageDistress}<span className="text-xs font-normal">/100</span></div>
+            <div className="text-[10px] text-indigo-700">Across stored check-ins</div>
+          </div>
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5">
+            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">Priority cases</span><ShieldAlert className="h-4 w-4 text-rose-600" /></div>
+            <div className="mt-1 text-2xl font-bold text-rose-950">{highRiskShare}%</div>
+            <div className="text-[10px] text-rose-700">High + critical check-ins</div>
+          </div>
+          <div className="rounded-xl border border-stone-200 bg-stone-50 p-3.5">
+            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-stone-600">Stored assessments</span><BarChart3 className="h-4 w-4 text-stone-600" /></div>
+            <div className="mt-1 text-2xl font-bold text-stone-900">{records.length}</div>
+            <div className="text-[10px] text-stone-600">Real PostgreSQL check-ins</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <div className="mb-3 flex items-center justify-between"><div><h4 className="text-xs font-semibold text-stone-900">Risk distribution</h4><p className="text-[10px] text-stone-500">Current database check-in classification</p></div><BarChart3 className="h-4 w-4 text-stone-500" /></div>
+            {[['Critical', criticalCount, records.length ? criticalCount / records.length : 0, 'bg-rose-500'], ['High', amberCount, records.length ? amberCount / records.length : 0, 'bg-amber-500'], ['Medium', yellowCount, records.length ? yellowCount / records.length : 0, 'bg-yellow-500'], ['Low', greenCount, records.length ? greenCount / records.length : 0, 'bg-emerald-500']].map(([label, count, ratio, bar]) => (
+              <div key={String(label)} className="mb-2 last:mb-0">
+                <div className="mb-1 flex justify-between text-[10px] text-stone-600"><span>{label}</span><span className="font-mono font-semibold">{count}</span></div>
+                <div className="h-2 overflow-hidden rounded-full bg-stone-200"><div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.max(Number(ratio) * 100, count ? 3 : 0)}%` }} /></div>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <div className="mb-3 flex items-center justify-between"><div><h4 className="text-xs font-semibold text-stone-900">Recent distress analysis</h4><p className="text-[10px] text-stone-500">Latest stored assessments, oldest → newest</p></div><TrendingUp className="h-4 w-4 text-stone-500" /></div>
+            {sortedRecent.length ? (
+              <div className="flex h-28 items-end gap-2">
+                {sortedRecent.map((record, index) => { const value = Math.max(0, Math.min(100, Number(record.distressPredictionScore || 0))); return <div key={`${record.recordId}-${index}`} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`${record.victimId}: ${value}/100`}>
+                  <span className="text-[9px] font-mono text-stone-500">{value}</span>
+                  <div className="w-full max-w-7 rounded-t-md bg-emerald-500" style={{ height: `${Math.max(value, 5)}%` }} />
+                  <span className="max-w-full truncate text-[9px] font-mono text-stone-500">{record.victimId}</span>
+                </div> })}
+              </div>
+            ) : <div className="flex h-28 items-center justify-center text-xs text-stone-400">No database assessments yet.</div>}
           </div>
         </div>
 
@@ -232,8 +303,41 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
                     {getPriorityBadge(selectedRecord.triagePriority)}
                   </h4>
                 </div>
-                <span className="text-xs font-mono text-stone-500">{selectedRecord.recordId}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-stone-500">{selectedRecord.recordId}</span>
+                  <button
+                    type="button"
+                    disabled={!authToken}
+                    onClick={async () => {
+                      if (!authToken) return;
+                      if (!window.confirm(`Close case ${selectedRecord.victimId}? It will be removed from the active officials dashboard.`)) return;
+                      const response = await fetch(`/api/database/victims/${encodeURIComponent(selectedRecord.victimId)}/close`, { method: 'POST', headers: { Authorization: `Bearer ${authToken}` } });
+                      const data = await response.json();
+                      if (!response.ok) { window.alert(data.error || 'Unable to close case.'); return; }
+                      setSelectedRecord(null);
+                      setCaseAnalysis(null);
+                      onRefresh();
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                    title="Close case"
+                  >
+                    <XCircle className="h-3.5 w-3.5" /> Close case
+                  </button>
+                </div>
               </div>
+
+              {caseAnalysis && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3.5 space-y-3">
+                  <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Longitudinal case analysis</div><div className="text-[10px] text-stone-500">Doctor baseline compared with this victim's saved check-ins</div></div><span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-indigo-700">{caseAnalysis.summary.direction}</span></div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500">Baseline</div><div className="text-sm font-bold">{caseAnalysis.summary.baselineScore ?? caseAnalysis.victim.baseline_distress_score}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500">Latest</div><div className="text-sm font-bold">{caseAnalysis.summary.latestScore}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500">Average</div><div className="text-sm font-bold">{caseAnalysis.summary.averageScore}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500">Check-ins</div><div className="text-sm font-bold">{caseAnalysis.summary.checkinCount}</div></div>
+                  </div>
+                  <div className="flex h-20 items-end gap-1">{caseAnalysis.history.slice(-10).map((h:any)=><div key={h.id} className="flex-1 h-full flex items-end" title={`${h.score}/100`}><div className="w-full rounded-t bg-indigo-500" style={{height:`${Math.max(5, Number(h.score))}%`}} /></div>)}</div>
+                </div>
+              )}
 
               {/* Recommended Official Protocol */}
               <div className="p-3.5 rounded-xl bg-stone-900 text-white space-y-1.5">

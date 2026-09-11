@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { LockKeyhole, ShieldCheck } from 'lucide-react';
 
 interface VictimAccessGateProps {
-  victimId: string;
   onAuthenticated: (victimId: string) => void;
 }
 
-export const VictimAccessGate: React.FC<VictimAccessGateProps> = ({ victimId, onAuthenticated }) => {
+export const VictimAccessGate: React.FC<VictimAccessGateProps> = ({ onAuthenticated }) => {
+  const [victimId, setVictimId] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -36,10 +36,10 @@ export const VictimAccessGate: React.FC<VictimAccessGateProps> = ({ victimId, on
     <section className="mx-auto max-w-md rounded-2xl border border-emerald-200 bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center gap-3">
         <div className="rounded-xl bg-emerald-100 p-3 text-emerald-700"><LockKeyhole className="h-5 w-5" /></div>
-        <div><h2 className="text-base font-semibold text-stone-900">Private Victim Access</h2><p className="text-xs text-stone-500">Validate your database record to continue.</p></div>
+        <div><h2 className="text-base font-semibold text-stone-900">Private Victim Access</h2><p className="text-xs text-stone-500">Enter your assigned case credentials to continue.</p></div>
       </div>
       <form onSubmit={authenticate} className="space-y-3">
-        <input required value={victimId} readOnly className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-xs font-mono text-stone-700" />
+        <input required value={victimId} onChange={event => setVictimId(event.target.value)} placeholder="Victim ID" autoComplete="username" className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-xs font-mono text-stone-700" />
         <input required value={name} onChange={event => setName(event.target.value)} placeholder="Full name assigned by an official" className="w-full rounded-xl border border-stone-200 px-3 py-2.5 text-xs text-stone-800" />
         <input required type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Assigned password" className="w-full rounded-xl border border-stone-200 px-3 py-2.5 text-xs text-stone-800" />
         {error && <div className="rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700">{error}</div>}

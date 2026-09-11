@@ -19,7 +19,7 @@ export const PipelineApiDocs: React.FC = () => {
       curl: `curl -X POST http://localhost:3000/api/pipeline/process \\
   -H "Content-Type: application/json" \\
   -d '{
-    "victimId": "VIC-CONFLICT-701",
+    "victimId": "YOUR_VICTIM_ID",
     "modality": "text",
     "checkType": "periodic_check",
     "input": "Artillery shelling restarted near our temporary shelter. My hands won'\''t stop shaking and I feel terrified they will target our warehouse.",
@@ -27,7 +27,7 @@ export const PipelineApiDocs: React.FC = () => {
   }'`,
       response: `{
   "executionId": "EXEC-M7K2...",
-  "victimId": "VIC-CONFLICT-701",
+  "victimId": "YOUR_VICTIM_ID",
   "pipelineStageResults": {
     "aiEngineAnalysis": {
       "emotionAnalysis": { "primaryEmotion": "Terror / Acute Panic", "arousalLevel": 88 },
@@ -60,7 +60,7 @@ export const PipelineApiDocs: React.FC = () => {
       curl: `curl -X POST http://localhost:3000/api/pipeline/periodic-check \\
   -H "Content-Type: application/json" \\
   -d '{
-    "victimId": "VIC-BORDER-903",
+    "victimId": "YOUR_VICTIM_ID",
     "checkPrompt": "Scheduled 48h wellness check: Please share how you are managing stress today.",
     "simulatedResponse": "Doing slightly better today after meeting the legal advisor. Slept 6 hours.",
     "modality": "text"
@@ -71,21 +71,21 @@ export const PipelineApiDocs: React.FC = () => {
       method: 'GET',
       path: '/api/pipeline/victims/:victimId/conversations',
       description: 'Fetches strictly isolated historical conversation turns for the specified victim from the database vault.',
-      curl: `curl -s http://localhost:3000/api/pipeline/victims/VIC-CONFLICT-701/conversations`
+      curl: `curl -s http://localhost:3000/api/pipeline/victims/{victimId}/conversations`
     },
     {
       title: '4. Fetch Victim Profile from Database',
       method: 'GET',
       path: '/api/pipeline/victims/:victimId',
       description: 'Fetches the isolated victim profile, trauma background, caseworker allocation, and baseline metrics from the database.',
-      curl: `curl -s http://localhost:3000/api/pipeline/victims/VIC-CONFLICT-701`
+      curl: `curl -s http://localhost:3000/api/pipeline/victims/{victimId}`
     },
     {
       title: '5. Dynamic Distress Score History & Trend',
       method: 'GET',
       path: '/api/pipeline/victims/:victimId/trend',
       description: 'Retrieves the historical distress score data points exclusively for this victim to evaluate trend trajectory.',
-      curl: `curl -s http://localhost:3000/api/pipeline/victims/VIC-CONFLICT-701/trend`
+      curl: `curl -s http://localhost:3000/api/pipeline/victims/{victimId}/trend`
     },
     {
       title: '6. Register New Victim in Database',
@@ -95,8 +95,8 @@ export const PipelineApiDocs: React.FC = () => {
       curl: `curl -X POST http://localhost:3000/api/pipeline/victims \\
   -H "Content-Type: application/json" \\
   -d '{
-    "victimId": "VIC-NEW-5501",
-    "pseudonym": "Survivor-Kherson-9",
+    "victimId": "<VICTIM_ID_FROM_DATABASE>",
+    "pseudonym": "<VICTIM_NAME_FROM_DATABASE>",
     "traumaContext": "Civilian displacement from flood and conflict zone",
     "baselineDistressScore": 48,
     "assignedAgency": "Humanitarian Protection Casework"
@@ -124,8 +124,8 @@ export const PipelineApiDocs: React.FC = () => {
       curl: `curl -X POST http://localhost:3000/api/database/victims \\
   -H "Content-Type: application/json" \\
   -d '{
-    "id": "VIC-CONFLICT-701",
-    "name": "Olena Shevchenko",
+    "id": "YOUR_VICTIM_ID",
+    "name": "Database victim name",
     "case_id": "CASE-UA-2026-044",
     "risk_level": "High",
     "latest_score": 78
@@ -136,7 +136,7 @@ export const PipelineApiDocs: React.FC = () => {
       method: 'GET',
       path: '/api/database/checkins?victim_id=:victimId',
       description: 'Retrieves all persisted check-ins for a victim, ordered chronologically by created_at.',
-      curl: `curl -s "http://localhost:3000/api/database/checkins?victim_id=VIC-CONFLICT-701"`
+      curl: `curl -s "http://localhost:3000/api/database/checkins?victim_id={victimId}"`
     },
     {
       title: '11. Record Manual Check-in to Database',
@@ -146,7 +146,7 @@ export const PipelineApiDocs: React.FC = () => {
       curl: `curl -X POST http://localhost:3000/api/database/checkins \\
   -H "Content-Type: application/json" \\
   -d '{
-    "victim_id": "VIC-CONFLICT-701",
+    "victim_id": "{victimId}",
     "message": "Heavy artillery barrage started again. Need immediate grounding support.",
     "score": 85,
     "risk_category": "Critical",

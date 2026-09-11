@@ -27,29 +27,24 @@ export async function executeBackendPipeline(
   payload: PipelineProcessPayload
 ): Promise<PipelineExecutionResult> {
   const db = getVictimDatabase();
-  const victimId = payload.victimId || `VIC-${Math.floor(1000 + Math.random() * 9000)}`;
+  const rawVictimId = payload?.victimId;
+  const victimId = typeof rawVictimId === 'string'
+    ? rawVictimId.trim()
+    : (rawVictimId && typeof rawVictimId === 'object' && 'id' in rawVictimId
+      ? String((rawVictimId as { id?: unknown }).id ?? '').trim()
+      : '');
+  if (!victimId) {
+    throw new Error('victimId is required. The pipeline only processes registered database victims.');
+  }
   const modality: InputModality = payload.modality || 'text';
   const checkType: PipelineCheckType = payload.checkType || 'direct_input';
 
   // =========================================================================
   // 1. ISOLATION CHECK: Fetch victim details & isolated history from Database
   // =========================================================================
-  let victimProfile = await db.getVictimProfile(victimId);
+  const victimProfile = await db.getVictimProfile(victimId);
   if (!victimProfile) {
-    // Register initial profile in database for new victim
-    victimProfile = {
-      victimId,
-      pseudonym: `Survivor-${victimId.slice(-4)}`,
-      demographics: { ageRange: 'Unknown', region: 'Field Intake' },
-      traumaContext: 'Intake disclosure pending full clinical interview.',
-      baselineDistressScore: 50,
-      assignedAgency: 'Rapid Trauma & Humanitarian Casework Network',
-      assignedCaseworker: 'Duty Caseworker',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    await db.saveVictimProfile(victimProfile);
+    throw new Error(`Victim ${victimId} is not registered in the database. Create the case first.`);
   }
 
   // Fetch only this victim's isolated history (strict per-victim isolation)
@@ -387,26 +382,19 @@ CRISIS FLAGS: ${filterResult.crisisDetection.reasons.join('; ') || 'None'}`;
     score: dynamicDistressScore,
     risk_category: riskClassification.classification,
     trigger_factors: nlpCategories.length > 0 ? nlpCategories : ['trauma_exposure', 'wellness_check'],
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    ingestion_channel: payload.channel || 'victim_dashboard'
   };
   await db.recordCheckin(checkinRecord);
 
   // Update victims table (id, name, case_id, risk_level, latest_score)
   let victimDbRec = await db.getVictimDbRecord(victimId);
   if (!victimDbRec) {
-    victimDbRec = {
-      id: victimId,
-      name: victimProfile.pseudonym || `Survivor ${victimId}`,
-      case_id: `CASE-${victimId.replace(/[^a-zA-Z0-9]/g, '')}`,
-      risk_level: riskClassification.classification,
-      latest_score: dynamicDistressScore
-    };
-    await db.saveVictimDbRecord(victimDbRec);
-  } else {
-    await db.updateVictimScore(victimId, riskClassification.classification, dynamicDistressScore);
-    victimDbRec.risk_level = riskClassification.classification;
-    victimDbRec.latest_score = dynamicDistressScore;
+    throw new Error(`Victim ${victimId} disappeared from the database during pipeline execution.`);
   }
+  await db.updateVictimScore(victimId, riskClassification.classification, dynamicDistressScore);
+  victimDbRec.risk_level = riskClassification.classification;
+  victimDbRec.latest_score = dynamicDistressScore;
 
   // Update victim status in DB if escalated
   if (riskClassification.branch === 'High/Critical') {

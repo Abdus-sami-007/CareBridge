@@ -77,7 +77,7 @@ import {
 
 // Run check-in through NLP + Distress Prediction Engine
 const result = await processVictimCheckin({
-  victimId: 'VIC-CONFLICT-701',
+  victimId: process.env.VICTIM_ID!,
   modality: 'text',
   checkType: 'periodic_check',
   input: 'Artillery shelling resumed nearby. Severe anxiety.',
@@ -131,27 +131,83 @@ npm start
 
 ## Updating the Database
 
-### Neon REST API
+### Neon PostgreSQL
 
-The app can connect to the supplied Neon PostgREST endpoint through the server-side `NeonRestAdapter`.
+CareBridge uses the Neon PostgreSQL connection string directly through the server-side `DATABASE_URL`. The connection is never exposed to the browser.
 
 1. Copy `.env.example` to `.env`.
-2. Set `NEON_API_URL` to your Neon REST endpoint and `NEON_API_KEY` to the Neon Data API key. `NEON_DATABASE_URL` remains supported as a legacy alias.
-3. Ensure the `victims` and `checkins` tables use the schemas above.
-4. Start the app with `npm run dev`.
+2. Set `DATABASE_URL` to your Neon PostgreSQL connection string.
+3. Start the app with `npm run dev`.
+4. On startup, CareBridge connects to Neon and creates/updates the required `victims` and `checkins` tables automatically.
+5. Verify the connection from the Officials Dashboard or `GET /api/database/connection-test`.
 
-When either Neon environment variable is configured, the server uses Neon for the `victims` and `checkins` tables. Without them, it keeps the local in-memory adapter so the demo still runs. The API key is never sent to the browser.
-
-To connect another external database (PostgreSQL, MongoDB, or Firestore), implement `IDatabaseAdapter` and register it with `setDatabaseAdapter`.
+The pipeline only accepts a `victimId` that already exists in `victims`. It never invents a victim, creates an anonymous record, or stores runtime records in memory.
 
 ### Telegram Check-in Bot
 
-The optional `checkin_bot.py` forwards Telegram text and voice check-ins to the existing CareBridge pipeline. It does not score messages or write to the database directly.
+The Telegram worker starts **automatically when the CareBridge server starts**. You no longer need a second terminal or separate process.
 
-1. Install Python dependencies with `pip install -r requirements.txt`.
-2. Set `BOT_TOKEN` and `CAREBRIDGE_API_URL` in `.env`.
-3. Start CareBridge with `npm run dev` or the production server.
-4. Run `python checkin_bot.py`.
-5. Use `/start CASE_ID` in Telegram to link the chat to an existing victim record. Without a case ID, the bot uses a stable `VIC-TG-<chat suffix>` identity.
+1. Install Node and Python 3.
+2. Install dependencies with `npm install` and `pip install -r requirements.txt`.
+3. Set `BOT_TOKEN` in `.env`.
+4. Start CareBridge with `npm run dev` (development) or `npm run build && npm start` (production).
+5. The server starts `checkin_bot.py` automatically after the HTTP server is listening.
 
-Text and transcribed voice messages are sent to `POST /api/ingest/telegram`, then sanitized, scored, persisted as check-ins, and returned as the victim reply. Set `OPENAI_API_KEY` only when voice transcription is required.
+The bot uses `CAREBRIDGE_API_URL` to send text and voice check-ins back to the same CareBridge API. By default this is `http://127.0.0.1:<PORT>`. `BOT_ENABLED=false` disables automatic startup. `PYTHON_BIN` can be set when the deployment environment uses a custom Python executable.
+
+For voice notes, also set `OPENAI_API_KEY`; text Telegram check-ins do not require it.
+
+### Deployment with Docker
+
+The included `Dockerfile` packages Node.js, Python 3, the Telegram dependencies, and the web application into one deployable service. The Telegram bot runs as a child process of the web server.
+
+```bash
+docker build -t carebridge .
+docker run --env-file .env -p 3000:3000 carebridge
+```
+
+Or with Docker Compose:
+
+```bash
+docker compose up -d --build
+```
+
+Set `DATABASE_URL`, `GEMINI_API_KEY`, and `BOT_TOKEN` as deployment secrets/environment variables. Do not commit `.env`.
+
+## Real database setup
+
+CareBridge intentionally does not seed demo victims, generate anonymous pipeline victims, or fall back to an in-memory runtime store. The Victim Dashboard opens directly to the database-backed check-in assistant on startup; a real registered victim must authenticate before submitting a check-in.
+
+1. Set `DATABASE_URL` to your Neon PostgreSQL connection string.
+2. Set `GEMINI_API_KEY` if you want Gemini scoring; the deterministic trauma rule engine remains available when Gemini is not configured.
+3. Start the app. The server connects to Neon and provisions the required tables automatically.
+4. Register a real victim through the Officials Dashboard.
+5. Authenticate as that victim. The chatbot loads persisted check-ins from Neon, and every new message follows the pipeline: **Victim → Periodic/Direct Check → Text/Voice/Events → AI Engine → Dynamic Distress Score → Trend + Prediction → Risk Classification → Monitoring OR Alert → Human Intervention → Follow-up & Recovery**.
+
+There are no pre-populated victim names, IDs, scores, or check-ins in the application runtime.
+
+## Longitudinal analysis and clinical baseline
+
+CareBridge now keeps a clinician-provided baseline separate from the latest dynamic distress score. The `victims` table contains `baseline_distress_score`, `doctor_initial_score`, `doctor_name`, and `doctor_notes`; check-in scores remain in `checkins` and are never used to overwrite the clinician baseline.
+
+The victim analysis endpoint is `GET /api/analysis/victim/:victimId`. It compares the clinician baseline with the victim's historical check-ins, computes average/latest score and direction, and is displayed in the victim dashboard and the selected case view for officials.
+
+Only Admin can view the official-account list or create sub-official accounts. Sub-officials do not receive the account-management UI and the API also rejects their requests.
+
+## Production deployment
+
+CareBridge is designed to run as a single long-lived service so the HTTP API and Telegram polling worker share the same deployment. Use a platform that supports persistent Node/Python processes (for example a container service or VM). Do not deploy the Telegram polling worker as a serverless function.
+
+Required production environment variables:
+- `DATABASE_URL`
+- `GEMINI_API_KEY` (recommended)
+- `BOT_TOKEN`
+- `BOT_ENABLED=true`
+
+The server exposes the normal application on port `PORT` (default `3000`).
+
+
+### Existing Neon database migration
+If the existing `checkins.id` column was created as an integer, run `database/003_checkin_id_telegram_identity.sql` once. New CareBridge installs perform the compatibility migration automatically on startup.
+
+For Telegram, add the victim's Telegram username (without `@`) to the victim record. The bot verifies the actual Telegram account username against this database mapping before accepting `/start`, text, or voice check-ins.

@@ -4,6 +4,7 @@ dotenv.config();
 import express from 'express';
 import net from 'node:net';
 import crypto from 'node:crypto';
+import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -23,7 +24,7 @@ import {
   PRISMA_SCHEMA_PLACEHOLDER,
   NEON_REST_QUERY_EXAMPLES
 } from './src/db/databasePlaceholder.ts';
-import { isNeonRestConfigured, NeonRestAdapter } from './src/db/neonRestAdapter.ts';
+import { getDatabaseUrl, isNeonPostgresConfigured, NeonPostgresAdapter } from './src/db/neonPostgresAdapter.ts';
 import type {
   FilterSettings,
   TraumaScores,
@@ -36,11 +37,10 @@ import type {
   VictimDbRecord,
   CheckinDbRecord,
   VictimDashboardPayload,
-  OfficialsDashboardPayload
+  OfficialsDashboardPayload,
+  OfficialDbRecord
 } from './src/types.ts';
 
-// In-Memory Repository of Processed Atrocity Trauma Records
-const recordsStore: ProcessedAtrocityRecord[] = [];
 
 function hashVictimPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -53,6 +53,87 @@ function verifyVictimPassword(password: string, stored: string): boolean {
   if (!salt || !expected) return false;
   const actual = crypto.scryptSync(password, salt, 64).toString('hex');
   return crypto.timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
+}
+
+type OfficialSession = { username: string; role: 'admin' | 'sub_official'; displayName: string; createdAt: number };
+const officialSessions = new Map<string, OfficialSession>();
+
+function createOfficialSession(session: OfficialSession): string {
+  const token = crypto.randomBytes(32).toString('hex');
+  officialSessions.set(token, session);
+  return token;
+}
+
+function getOfficialSession(req: express.Request): OfficialSession | null {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) return null;
+  return officialSessions.get(header.slice(7)) || null;
+}
+
+function requireOfficial(req: express.Request, res: express.Response): OfficialSession | null {
+  const session = getOfficialSession(req);
+  if (!session) { res.status(401).json({ error: 'Official login required.' }); return null; }
+  return session;
+}
+
+function requireAdmin(req: express.Request, res: express.Response): OfficialSession | null {
+  const session = requireOfficial(req, res);
+  if (!session) return null;
+  if (session.role !== 'admin') { res.status(403).json({ error: 'Only the Admin official can add sub-official accounts.' }); return null; }
+  return session;
+}
+
+
+let telegramBotProcess: ChildProcess | null = null;
+
+function startTelegramBot(port: number): void {
+  const token = process.env.BOT_TOKEN?.trim();
+  const enabled = (process.env.BOT_ENABLED ?? 'true').toLowerCase() !== 'false';
+  if (!enabled) {
+    console.log('[Telegram] Auto-start disabled with BOT_ENABLED=false.');
+    return;
+  }
+  if (!token) {
+    console.log('[Telegram] BOT_TOKEN is not configured; Telegram bot is disabled.');
+    return;
+  }
+
+  const scriptPath = path.join(process.cwd(), 'checkin_bot.py');
+  const pythonCommand = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
+  const botEnv = {
+    ...process.env,
+    BOT_TOKEN: token,
+    CAREBRIDGE_API_URL: process.env.CAREBRIDGE_API_URL || `http://127.0.0.1:${port}`,
+  };
+
+  console.log(`[Telegram] Starting bot automatically with ${pythonCommand}...`);
+  telegramBotProcess = spawn(pythonCommand, [scriptPath], {
+    cwd: process.cwd(),
+    env: botEnv,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  telegramBotProcess.stdout?.on('data', data => process.stdout.write(`[Telegram] ${data}`));
+  telegramBotProcess.stderr?.on('data', data => process.stderr.write(`[Telegram] ${data}`));
+  telegramBotProcess.on('error', err => {
+    console.error(`[Telegram] Failed to start bot: ${err.message}`);
+    telegramBotProcess = null;
+  });
+  telegramBotProcess.on('exit', (code, signal) => {
+    if (code !== 0 && signal !== 'SIGTERM') {
+      console.error(`[Telegram] Bot exited unexpectedly (code=${code}, signal=${signal}).`);
+    } else {
+      console.log('[Telegram] Bot stopped.');
+    }
+    telegramBotProcess = null;
+  });
+}
+
+function stopTelegramBot(): void {
+  if (!telegramBotProcess) return;
+  console.log('[Telegram] Stopping bot...');
+  telegramBotProcess.kill('SIGTERM');
+  telegramBotProcess = null;
 }
 
 async function findAvailablePort(preferredPort: number): Promise<number> {
@@ -79,6 +160,12 @@ async function processDisclosure(
   channelMetadata: ChannelMetadata = { channel },
   customSettings?: Partial<FilterSettings>
 ): Promise<FullEvaluationResponse> {
+  const database = getDatabaseAdapter();
+  const registeredVictim = await database.getVictim(victimId);
+  if (!registeredVictim) {
+    throw new Error(`Victim ${victimId} is not registered in the database. Register the case before ingestion.`);
+  }
+
   const settings: FilterSettings = {
     redactPii: true,
     redactLocations: true,
@@ -278,12 +365,7 @@ Return the structured assessment JSON.`;
     timestamp: new Date().toISOString()
   };
 
-  // Prepend to in-memory store
-  recordsStore.unshift(processedRecord);
-  if (recordsStore.length > 100) recordsStore.pop();
-
   // Keep every channel on the same durable database path as the backend pipeline.
-  const database = getDatabaseAdapter();
   const databaseScore = scores.acuteDistressScore;
   const databaseRisk = filterResult.crisisDetection.requiresImmediateHelp || databaseScore >= 75
     ? 'Critical'
@@ -299,21 +381,11 @@ Return the structured assessment JSON.`;
     score: databaseScore,
     risk_category: databaseRisk,
     trigger_factors: filterResult.traumaTags.map(tag => tag.label),
-    created_at: processedRecord.timestamp
+    created_at: processedRecord.timestamp,
+    ingestion_channel: channel
   });
 
-  const existingVictim = await database.getVictim(victimId);
-  if (existingVictim) {
-    await database.updateVictimScore(victimId, databaseRisk, databaseScore);
-  } else {
-    await database.upsertVictim({
-      id: victimId,
-      name: `Survivor ${victimId}`,
-      case_id: `CASE-${victimId.replace(/[^a-zA-Z0-9]/g, '')}`,
-      risk_level: databaseRisk,
-      latest_score: databaseScore
-    });
-  }
+  await database.updateVictimScore(victimId, databaseRisk, databaseScore);
 
   return {
     filter: filterResult,
@@ -385,7 +457,7 @@ async function getDatabaseOfficialsFeed(): Promise<OfficialsDashboardPayload[]> 
     return {
       recordId: checkin.id,
       victimId: checkin.victim_id,
-      ingestionChannel: 'victim_dashboard',
+      ingestionChannel: checkin.ingestion_channel || 'victim_dashboard',
       triagePriority,
       atrocityType: 'Database check-in',
       traumaSeverityScore: score,
@@ -418,24 +490,66 @@ async function startServer() {
     console.warn(`[CareBridge] Port ${preferredPort} is busy; using port ${PORT}.`);
   }
 
-  if (isNeonRestConfigured()) {
-    setDatabaseAdapter(new NeonRestAdapter());
-    console.log('[DatabaseAdapter] Neon REST adapter enabled');
+  if (isNeonPostgresConfigured()) {
+    const adapter = new NeonPostgresAdapter(getDatabaseUrl());
+    try {
+      await adapter.connect();
+      setDatabaseAdapter(adapter);
+      const adminPasswordHash = hashVictimPassword('12345678');
+      const admin = await adapter.getOfficialByUsername('Admin');
+      if (!admin) {
+        await adapter.createOfficial({
+          id: 'OFF-ADMIN', username: 'Admin', display_name: 'System Administrator',
+          role: 'admin', active: true, created_at: new Date().toISOString()
+        }, adminPasswordHash);
+        console.log('[Officials] Created initial Admin account (username: Admin)');
+      } else {
+        // Keep the built-in bootstrap account usable after schema/data migrations.
+        // This also repairs an Admin row that was created with an invalid/old password hash.
+        await adapter.setOfficialPassword('Admin', adminPasswordHash);
+        console.log('[Officials] Verified Admin account and refreshed bootstrap password');
+      }
+      console.log('[DatabaseAdapter] Neon PostgreSQL connected and schema verified');
+    } catch (error) {
+      await adapter.disconnect().catch(() => undefined);
+      console.error('[DatabaseAdapter] Neon connection failed:', error);
+      throw error;
+    }
+  } else {
+    console.warn('[DatabaseAdapter] DATABASE_URL is not configured. Database-backed routes will fail closed.');
   }
 
   app.use(express.json({ limit: '10mb' }));
 
   // 1. Health check & System info
-  app.get('/api/health', (req, res) => {
-    res.json({
-      status: 'ok',
-      module: 'Trauma Ingestion, Filtering & Distress Prediction Module',
-      system: 'AI-Powered Dynamic Mental Health Monitoring and Distress Prediction System for Victims of Atrocities',
-      activeChannels: ['victim_dashboard', 'whatsapp', 'telegram', 'ivr', 'speech'],
-      storedRecordsCount: recordsStore.length,
-      hasGeminiApiKey: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY',
-      timestamp: new Date().toISOString()
-    });
+  app.get('/api/health', async (req, res) => {
+    try {
+      const checkins = await getDatabaseAdapter().listCheckins(1000);
+      const victims = await getDatabaseAdapter().listVictims();
+      res.json({
+        status: 'ok',
+        module: 'Trauma Ingestion, Filtering & Distress Prediction Module',
+        system: 'AI-Powered Dynamic Mental Health Monitoring and Distress Prediction System for Victims of Atrocities',
+        activeChannels: ['victim_dashboard', 'whatsapp', 'telegram', 'ivr', 'speech'],
+        storedRecordsCount: checkins.length,
+        registeredVictimsCount: victims.length,
+        database: {
+          configured: isNeonPostgresConfigured(),
+          connected: getDatabaseAdapter().isConnected(),
+          adapter: getDatabaseAdapter().name,
+          note: 'Runtime victim and check-in data is read from and written to Neon PostgreSQL. No sample records are seeded.'
+        },
+        hasGeminiApiKey: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY',
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(503).json({
+        status: 'degraded',
+        database: { configured: isNeonPostgresConfigured(), connected: false, adapter: getDatabaseAdapter().name },
+        error: err.message || 'Database health check failed',
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
   // 2. Generic Ingestion Endpoint
@@ -448,9 +562,12 @@ async function startServer() {
       }
 
       const activeChannel: IngestionChannel = channel || 'victim_dashboard';
-      const effectiveVictimId = victimId || `VIC-${Math.floor(1000 + Math.random() * 9000)}`;
+      if (!victimId || typeof victimId !== 'string' || !victimId.trim()) {
+        res.status(400).json({ error: 'victimId is required. Register the victim in the database before starting a check-in.' });
+        return;
+      }
 
-      const result = await processDisclosure(input, activeChannel, effectiveVictimId, metadata, settings);
+      const result = await processDisclosure(input, activeChannel, victimId.trim(), metadata, settings);
       res.json(result);
     } catch (err) {
       console.error('Ingestion error:', err);
@@ -468,7 +585,11 @@ async function startServer() {
         return;
       }
 
-      const vId = victimId || `VIC-WEB-${Math.floor(1000 + Math.random() * 9000)}`;
+      if (!victimId || typeof victimId !== 'string' || !victimId.trim()) {
+        res.status(400).json({ error: 'victimId is required. Register the victim before starting a web check-in.' });
+        return;
+      }
+      const vId = victimId.trim();
       const result = await processDisclosure(content, 'victim_dashboard', vId, {
         channel: 'victim_dashboard',
         senderIdentifier: vId,
@@ -483,21 +604,25 @@ async function startServer() {
         recordId: result.record.recordId
       });
     } catch (err) {
-      res.status(500).json({ error: 'Victim dashboard ingestion failed' });
+      res.status(422).json({ error: err instanceof Error ? err.message : 'Victim dashboard ingestion failed' });
     }
   });
 
   // 4. WhatsApp Chatbot Webhook Ingestion
   app.post('/api/ingest/whatsapp', async (req, res) => {
     try {
-      const { from, body, text, messageId } = req.body;
+      const { victimId, from, body, text, messageId } = req.body;
       const content = body || text;
       if (!content) {
         res.status(400).json({ error: 'Missing WhatsApp message body' });
         return;
       }
 
-      const vId = `VIC-WA-${(from || 'anon').replace(/[^a-zA-Z0-9]/g, '').slice(-4) || '9999'}`;
+      if (!victimId || typeof victimId !== 'string' || !victimId.trim()) {
+        res.status(400).json({ error: 'victimId is required for WhatsApp ingestion. Map the channel identity to a registered database victim first.' });
+        return;
+      }
+      const vId = victimId.trim();
       const result = await processDisclosure(content, 'whatsapp', vId, {
         channel: 'whatsapp',
         senderIdentifier: from ? `${from.slice(0, 4)}***${from.slice(-4)}` : 'Masked Phone',
@@ -526,17 +651,27 @@ async function startServer() {
       }
 
       const senderId = msg.from?.id ? String(msg.from.id) : 'anon_tg';
-      let vId = req.body.victimId as string | undefined;
-      if (!vId && req.body.victimName) {
-        const victims = await getDatabaseAdapter().listVictims();
-        const match = victims.find(victim => victim.name.trim().toLowerCase() === String(req.body.victimName).trim().toLowerCase());
-        if (!match) {
-          res.status(404).json({ error: 'No victim record matches that name' });
+      const telegramUsername = msg.from?.username ? String(msg.from.username).replace(/^@/, '').trim() : '';
+      let vId = typeof req.body.victimId === 'string' ? req.body.victimId.trim() : '';
+      const db: any = getDatabaseAdapter();
+
+      // Prefer the verified Telegram username mapping. A client cannot claim another victim ID.
+      if (telegramUsername && typeof db.getVictimByTelegramUsername === 'function') {
+        const mapped = await db.getVictimByTelegramUsername(telegramUsername);
+        if (!mapped) {
+          res.status(403).json({ error: `Telegram username @${telegramUsername} is not registered to an active victim case.` });
           return;
         }
-        vId = match.id;
+        if (vId && vId !== mapped.id) {
+          res.status(403).json({ error: 'Telegram account is not authorized for that victim ID.' });
+          return;
+        }
+        vId = mapped.id;
       }
-      vId = vId || `VIC-TG-${senderId.slice(-4)}`;
+      if (!vId) {
+        res.status(403).json({ error: 'Your Telegram username is not linked to an active victim record. Ask an official to register your Telegram username first.' });
+        return;
+      }
       const result = await processDisclosure(content, 'telegram', vId, {
         channel: 'telegram',
         senderIdentifier: msg.from?.username ? `@${msg.from.username}` : `TG_USER_${senderId.slice(-4)}`,
@@ -550,21 +685,25 @@ async function startServer() {
         recordId: result.record.recordId
       });
     } catch (err) {
-      res.status(500).json({ error: 'Telegram webhook processing failed' });
+      res.status(422).json({ error: err instanceof Error ? err.message : 'Telegram webhook processing failed' });
     }
   });
 
   // 6. IVR Telephony Call Ingestion
   app.post('/api/ingest/ivr', async (req, res) => {
     try {
-      const { callerNumber, audioTranscript, text, dtmfDistressRating, durationSeconds } = req.body;
+      const { victimId, callerNumber, audioTranscript, text, dtmfDistressRating, durationSeconds } = req.body;
       const content = audioTranscript || text;
       if (!content) {
         res.status(400).json({ error: 'Missing IVR audio transcript' });
         return;
       }
 
-      const vId = `VIC-IVR-${(callerNumber || 'anon').replace(/[^a-zA-Z0-9]/g, '').slice(-4) || '8888'}`;
+      if (!victimId || typeof victimId !== 'string' || !victimId.trim()) {
+        res.status(400).json({ error: 'victimId is required for IVR ingestion. Map the caller to a registered database victim first.' });
+        return;
+      }
+      const vId = victimId.trim();
       const result = await processDisclosure(content, 'ivr', vId, {
         channel: 'ivr',
         senderIdentifier: callerNumber ? `${callerNumber.slice(0, 3)}***${callerNumber.slice(-4)}` : 'Anonymous Hotline Caller',
@@ -592,7 +731,11 @@ async function startServer() {
         return;
       }
 
-      const vId = victimId || `VIC-VOICE-${Math.floor(1000 + Math.random() * 9000)}`;
+      if (!victimId || typeof victimId !== 'string' || !victimId.trim()) {
+        res.status(400).json({ error: 'victimId is required for voice ingestion.' });
+        return;
+      }
+      const vId = victimId.trim();
       const result = await processDisclosure(transcript, 'speech', vId, {
         channel: 'speech',
         senderIdentifier: vId,
@@ -614,8 +757,12 @@ async function startServer() {
   // 8. Backward-compatible endpoint for general filtering & scoring
   app.post('/api/filter-and-score', async (req, res) => {
     try {
-      const { input, settings } = req.body;
-      const vId = `VIC-${Math.floor(1000 + Math.random() * 9000)}`;
+      const { input, victimId, settings } = req.body;
+      if (!victimId || typeof victimId !== 'string' || !victimId.trim()) {
+        res.status(400).json({ error: 'victimId is required for filter-and-score.' });
+        return;
+      }
+      const vId = victimId.trim();
       const result = await processDisclosure(input, 'victim_dashboard', vId, { channel: 'victim_dashboard' }, settings);
       res.json(result);
     } catch (err) {
@@ -658,6 +805,7 @@ async function startServer() {
 
   // 10. Data Feed for Officials & Clinicians Dashboard
   app.get('/api/dashboards/officials', async (req, res) => {
+    if (!requireOfficial(req, res)) return;
     try {
       const records = await getDatabaseOfficialsFeed();
       res.json({
@@ -676,11 +824,13 @@ async function startServer() {
   });
 
   // 11. All Records Endpoint (Full Audit Data)
-  app.get('/api/records', (req, res) => {
-    res.json({
-      count: recordsStore.length,
-      records: recordsStore
-    });
+  app.get('/api/records', async (req, res) => {
+    try {
+      const checkins = await getDatabaseAdapter().listCheckins(100);
+      res.json({ count: checkins.length, records: checkins });
+    } catch {
+      res.status(503).json({ error: 'Database is unavailable; no in-memory records are used.' });
+    }
   });
 
   // =========================================================================
@@ -693,7 +843,13 @@ async function startServer() {
   // Core Pipeline Execution
   app.post('/api/pipeline/process', async (req, res) => {
     try {
-      const payload: PipelineProcessPayload = req.body;
+      const payload: PipelineProcessPayload = req.body || {};
+      if (payload.victimId && typeof payload.victimId !== 'string') {
+        const candidate = payload.victimId as unknown as { id?: unknown };
+        payload.victimId = typeof candidate === 'object' && candidate !== null && 'id' in candidate
+          ? String(candidate.id ?? '')
+          : String(payload.victimId);
+      }
       if (!payload.input && !payload.eventData) {
         res.status(400).json({ error: 'Missing input text, voice transcript, or event data' });
         return;
@@ -702,7 +858,7 @@ async function startServer() {
       res.json(result);
     } catch (err: any) {
       console.error('[Pipeline Engine Error]:', err);
-      res.status(500).json({ error: err.message || 'Pipeline execution failed' });
+      res.status(422).json({ error: err.message || 'Pipeline execution failed' });
     }
   });
 
@@ -941,6 +1097,24 @@ async function startServer() {
     }
   });
 
+  // Resolve a Telegram account username to exactly one active victim record.
+  app.get('/api/database/victims/resolve-telegram', async (req, res) => {
+    try {
+      const username = String(req.query.username || '').replace(/^@/, '').trim();
+      if (!username) { res.status(400).json({ error: 'username is required' }); return; }
+      const db = getDatabaseAdapter() as any;
+      if (typeof db.getVictimByTelegramUsername !== 'function') {
+        res.status(503).json({ error: 'Telegram username lookup is not available' }); return;
+      }
+      const victim = await db.getVictimByTelegramUsername(username);
+      if (!victim) { res.status(404).json({ error: 'No active victim is registered with that Telegram username' }); return; }
+      const { password_hash: _passwordHash, ...safeVictim } = victim;
+      res.json({ victim: safeVictim });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed to resolve Telegram username' });
+    }
+  });
+
   // Get specific victim by id
   app.get('/api/database/victims/:id', async (req, res) => {
     try {
@@ -962,27 +1136,47 @@ async function startServer() {
 
   // Create or update a victim record
   app.post('/api/database/victims', async (req, res) => {
+    if (!requireOfficial(req, res)) return;
     try {
-      const { id, name, case_id, risk_level, latest_score, password } = req.body;
+      const { id, name, case_id, risk_level, latest_score, password, baseline_distress_score, doctor_initial_score, doctor_name, doctor_notes, telegram_username } = req.body;
       if (!id || !name || !case_id) {
         res.status(400).json({
           error: 'Missing required victim fields. Required: id, name, case_id. Optional: risk_level, latest_score'
         });
         return;
       }
-      if (typeof password !== 'string' || password.length < 8) {
-        res.status(400).json({ error: 'A password of at least 8 characters is required.' });
+      const db = getDatabaseAdapter();
+      const existing = await db.getVictim(String(id));
+      if (!existing && (typeof password !== 'string' || password.length < 8)) {
+        res.status(400).json({ error: 'A password of at least 8 characters is required when creating a new victim.' });
+        return;
+      }
+      if (password !== undefined && typeof password !== 'string') {
+        res.status(400).json({ error: 'Password must be text when supplied.' });
+        return;
+      }
+      if (typeof password === 'string' && password.length > 0 && password.length < 8) {
+        res.status(400).json({ error: 'A password must contain at least 8 characters.' });
+        return;
+      }
+      const normalizedDoctorScore = typeof doctor_initial_score === 'number' ? Math.max(0, Math.min(100, doctor_initial_score)) : null;
+      if (!existing && normalizedDoctorScore === null) {
+        res.status(400).json({ error: 'Doctor initial distress score is required when creating a new victim.' });
         return;
       }
       const record: VictimDbRecord = {
-        id,
-        name,
-        case_id,
-        risk_level: risk_level || 'Low',
-        latest_score: typeof latest_score === 'number' ? latest_score : 0
-        ,password_hash: hashVictimPassword(password)
+        id: String(id).trim(),
+        name: String(name).trim(),
+        case_id: String(case_id).trim(),
+        risk_level: risk_level || existing?.risk_level || (normalizedDoctorScore! >= 75 ? 'Critical' : normalizedDoctorScore! >= 55 ? 'High' : normalizedDoctorScore! >= 35 ? 'Medium' : 'Low'),
+        latest_score: typeof latest_score === 'number' ? latest_score : Number(existing?.latest_score ?? normalizedDoctorScore ?? 0),
+        baseline_distress_score: typeof baseline_distress_score === 'number' ? Math.max(0, Math.min(100, baseline_distress_score)) : Number(existing?.baseline_distress_score ?? existing?.doctor_initial_score ?? existing?.latest_score ?? normalizedDoctorScore ?? 0),
+        doctor_initial_score: normalizedDoctorScore !== null ? normalizedDoctorScore : (existing?.doctor_initial_score ?? null),
+        doctor_name: typeof doctor_name === 'string' ? doctor_name.trim() || null : (existing?.doctor_name ?? null),
+        doctor_notes: typeof doctor_notes === 'string' ? doctor_notes.trim() || null : (existing?.doctor_notes ?? null),
+        telegram_username: typeof telegram_username === 'string' ? telegram_username.replace(/^@/, '').trim() || null : (existing?.telegram_username ?? null),
+        password_hash: password ? hashVictimPassword(password) : existing?.password_hash
       };
-      const db = getDatabaseAdapter();
       const saved = await db.upsertVictim(record);
       res.json({
         success: true,
@@ -994,6 +1188,79 @@ async function startServer() {
     }
   });
 
+  // Close a case: closed victims disappear from the active officials triage dashboard.
+  app.post('/api/database/victims/:id/close', async (req, res) => {
+    const session = requireOfficial(req, res);
+    if (!session) return;
+    try {
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Victim ID is required.' });
+      const db = getDatabaseAdapter() as any;
+      const victim = await db.closeVictim(id, session.username);
+      if (!victim) return res.status(404).json({ error: 'Victim not found.' });
+      res.json({ success: true, message: 'Case closed. It has been removed from the active officials dashboard.', victim });
+    } catch (err: any) {
+      console.error('[Case Close]', err);
+      res.status(500).json({ error: 'Unable to close case.' });
+    }
+  });
+
+  // Official authentication and account management
+  app.post('/api/official-auth/login', async (req, res) => {
+    try {
+      const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+      const password = typeof req.body?.password === 'string' ? req.body.password : '';
+      if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
+      const official = await (getDatabaseAdapter() as any).getOfficialByUsername(username);
+      if (!official || !official.active || !official.password_hash || !verifyVictimPassword(password, official.password_hash)) {
+        return res.status(401).json({ error: 'Invalid official credentials.' });
+      }
+      const token = createOfficialSession({ username: official.username, role: official.role, displayName: official.display_name, createdAt: Date.now() });
+      const { password_hash: _passwordHash, ...safeOfficial } = official;
+      res.json({ success: true, token, official: safeOfficial });
+    } catch (err) {
+      console.error('[Official Auth]', err);
+      res.status(500).json({ error: 'Official authentication failed.' });
+    }
+  });
+
+  app.post('/api/official-auth/logout', (req, res) => {
+    const header = req.headers.authorization || '';
+    if (header.startsWith('Bearer ')) officialSessions.delete(header.slice(7));
+    res.json({ success: true });
+  });
+
+  app.get('/api/official-auth/me', (req, res) => {
+    const session = getOfficialSession(req);
+    if (!session) return res.status(401).json({ error: 'Not authenticated.' });
+    res.json({ authenticated: true, official: { username: session.username, role: session.role, display_name: session.displayName } });
+  });
+
+  app.get('/api/officials', (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    getDatabaseAdapter().listOfficials().then(officials => res.json({ officials })).catch(() => res.status(500).json({ error: 'Failed to load officials.' }));
+  });
+
+  app.post('/api/officials', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+      const displayName = typeof req.body?.display_name === 'string' ? req.body.display_name.trim() : '';
+      const password = typeof req.body?.password === 'string' ? req.body.password : '';
+      if (!username || !displayName || !password) return res.status(400).json({ error: 'Username, display name, and password are required.' });
+      if (username.toLowerCase() === 'admin') return res.status(400).json({ error: 'Admin is reserved for the primary administrator.' });
+      if (password.length < 8) return res.status(400).json({ error: 'Password must contain at least 8 characters.' });
+      const existing = await (getDatabaseAdapter() as any).getOfficialByUsername(username);
+      if (existing) return res.status(409).json({ error: 'That username already exists.' });
+      const official: OfficialDbRecord = { id: `OFF-${Date.now()}`, username, display_name: displayName, role: 'sub_official', active: true, created_at: new Date().toISOString() };
+      const saved = await (getDatabaseAdapter() as any).createOfficial(official, hashVictimPassword(password));
+      res.status(201).json({ success: true, official: saved });
+    } catch (err: any) {
+      console.error('[Officials]', err);
+      res.status(500).json({ error: 'Unable to create sub-official.' });
+    }
+  });
+
   app.post('/api/victim-auth/login', async (req, res) => {
     try {
       const { victimId, name, password } = req.body;
@@ -1002,7 +1269,7 @@ async function startServer() {
         return;
       }
       const victim = await getDatabaseAdapter().getVictim(String(victimId));
-      if (!victim || victim.name.trim().toLowerCase() !== String(name).trim().toLowerCase() || !victim.password_hash || !verifyVictimPassword(String(password), victim.password_hash)) {
+      if (!victim || victim.closed || victim.name.trim().toLowerCase() !== String(name).trim().toLowerCase() || !victim.password_hash || !verifyVictimPassword(String(password), victim.password_hash)) {
         res.status(401).json({ error: 'Victim validation failed.' });
         return;
       }
@@ -1010,6 +1277,37 @@ async function startServer() {
       res.json({ success: true, victim: safeVictim });
     } catch {
       res.status(500).json({ error: 'Victim validation failed.' });
+    }
+  });
+
+  // Victim-specific longitudinal analysis: baseline + every historical check-in.
+  app.get('/api/analysis/victim/:victimId', async (req, res) => {
+    try {
+      const db = getDatabaseAdapter();
+      const victim = await db.getVictim(req.params.victimId);
+      if (!victim) return res.status(404).json({ error: 'Victim not found.' });
+      const checkins = await db.getCheckinsForVictim(victim.id, 200);
+      const baseline = Number(victim.doctor_initial_score ?? (Number(victim.baseline_distress_score || 0) > 0 ? victim.baseline_distress_score : victim.latest_score || 0));
+      const history = checkins.slice().reverse().map((c, index) => ({
+        index: index + 1,
+        id: c.id,
+        score: Number(c.score),
+        risk: c.risk_category,
+        createdAt: c.created_at,
+        message: c.message,
+        triggers: c.trigger_factors || []
+      }));
+      const scores = history.map(h => h.score);
+      const latest = scores.length ? scores[scores.length - 1] : Number(victim.latest_score || baseline);
+      const previous = scores.length > 1 ? scores[scores.length - 2] : null;
+      const average = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0) / scores.length) : baseline;
+      const deltaBaseline = latest - baseline;
+      const deltaPrevious = previous === null ? 0 : latest - previous;
+      const direction = deltaPrevious >= 5 ? 'Increasing' : deltaPrevious <= -5 ? 'Improving' : 'Stable';
+      res.json({ victim: { id: victim.id, name: victim.name, case_id: victim.case_id, risk_level: victim.risk_level, latest_score: Number(victim.latest_score), baseline_distress_score: baseline, doctor_initial_score: victim.doctor_initial_score ?? baseline, doctor_name: victim.doctor_name ?? null, doctor_notes: victim.doctor_notes ?? null }, summary: { baselineScore: baseline, checkinCount: history.length, averageScore: average, latestScore: latest, deltaBaseline, deltaPrevious, direction }, history });
+    } catch (err: any) {
+      console.error('[Analysis]', err);
+      res.status(500).json({ error: 'Unable to build victim longitudinal analysis.' });
     }
   });
 
@@ -1095,12 +1393,12 @@ async function startServer() {
         }
       },
       neonRestApi: {
-        baseUrl: process.env.NEON_API_URL || process.env.NEON_DATABASE_URL || 'not configured',
+        connection: isNeonPostgresConfigured() ? 'Configured server-side' : 'not configured',
         queryExamples: NEON_REST_QUERY_EXAMPLES
       },
       instructions: [
-        '1. Configure NEON_API_URL and NEON_API_KEY in the server .env file.',
-        '2. Create the victims and checkins tables using the PostgreSQL DDL above.',
+        '1. Configure DATABASE_URL with the Neon PostgreSQL connection string in the server .env file.',
+        '2. The server automatically creates/updates the victims and checkins tables on startup.',
         '3. Verify the live adapter with GET /api/database/connection-test.',
         '4. The pipeline writes check-ins and synchronizes the latest victim score through the active adapter.'
       ]
@@ -1122,9 +1420,18 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Atrocity Mental Health Distress Prediction Module] Server online at http://localhost:${PORT}`);
+    startTelegramBot(PORT);
   });
+
+  const shutdown = () => {
+    stopTelegramBot();
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5000).unref();
+  };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
 }
 
 startServer();

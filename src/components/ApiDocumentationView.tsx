@@ -49,7 +49,7 @@ const ENDPOINTS: EndpointSpec[] = [
   "records": [
     {
       "recordId": "REC-M58Z9L-8A2K",
-      "victimId": "VIC-WA-1029",
+      "victimId": "<VICTIM_ID_FROM_DATABASE>",
       "ingestionChannel": "whatsapp",
       "triagePriority": "CRITICAL_RED",
       "atrocityType": "Armed Conflict, Shelling & Aerial Bombardment",
@@ -74,7 +74,7 @@ const ENDPOINTS: EndpointSpec[] = [
     description: 'Supplies reassuring, non-pathologizing emotional status, grounding exercises, caseworker contacts, and privacy validation to the Victim Dashboard.',
     icon: <LayoutDashboard className="w-4 h-4 text-emerald-600" />,
     responsePayload: `{
-  "victimId": "VIC-WA-1029",
+  "victimId": "<VICTIM_ID_FROM_DATABASE>",
   "status": "Needs Attention",
   "compassionateGreeting": "Welcome back. You are in a safe, secure space. Your well-being and privacy are completely protected.",
   "plainTextDistressLevel": "Intense Overwhelm",
@@ -92,7 +92,7 @@ const ENDPOINTS: EndpointSpec[] = [
     { "name": "Emergency Lifeline (24/7)", "contact": "988" }
   ]
 }`,
-    curlExample: `curl -X GET https://your-domain.com/api/dashboards/victim/VIC-WA-1029`
+    curlExample: `curl -X GET https://your-domain.com/api/dashboards/victim/<VICTIM_ID_FROM_DATABASE>`
   },
   {
     method: 'POST',
@@ -170,7 +170,7 @@ const ENDPOINTS: EndpointSpec[] = [
     description: 'Ingests transcribed field audio notes and mobile medical unit voice recordings from survivors of atrocities.',
     icon: <Mic className="w-4 h-4 text-rose-600" />,
     requestBody: `{
-  "victimId": "VIC-VOICE-8812",
+  "victimId": "<VICTIM_ID_FROM_DATABASE>",
   "transcript": "During the raid on our village, extremists set fire to our center...",
   "audioQuality": "16kHz Single-channel",
   "durationSeconds": 88
@@ -183,7 +183,7 @@ const ENDPOINTS: EndpointSpec[] = [
 }`,
     curlExample: `curl -X POST https://your-domain.com/api/ingest/speech \\
   -H "Content-Type: application/json" \\
-  -d '{"victimId": "VIC-VOICE-01", "transcript": "Field audio recording..."}'`
+  -d '{"victimId": "<VICTIM_ID_FROM_DATABASE>", "transcript": "Field audio recording..."}'`
   }
 ];
 

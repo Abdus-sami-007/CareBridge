@@ -212,6 +212,17 @@ export type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
  * Explicit schema for Victims table/collection in database:
  * (id, name, case_id, risk_level, latest_score)
  */
+export type OfficialRole = 'admin' | 'sub_official';
+
+export interface OfficialDbRecord {
+  id: string;
+  username: string;
+  display_name: string;
+  role: OfficialRole;
+  active: boolean;
+  created_at: string;
+}
+
 export interface VictimDbRecord {
   id: string;
   name: string;
@@ -219,6 +230,14 @@ export interface VictimDbRecord {
   risk_level: RiskLevel | string;
   latest_score: number; // 0 - 100
   password_hash?: string;
+  baseline_distress_score?: number;
+  doctor_initial_score?: number | null;
+  doctor_name?: string | null;
+  doctor_notes?: string | null;
+  telegram_username?: string | null;
+  closed?: boolean;
+  closed_at?: string | null;
+  closed_by?: string | null;
 }
 
 /**
@@ -233,6 +252,7 @@ export interface CheckinDbRecord {
   risk_category: RiskLevel | string;
   trigger_factors: string[];
   created_at: string; // ISO 8601 string
+  ingestion_channel?: IngestionChannel;
 }
 
 export interface DistressTrendPrediction {

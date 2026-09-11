@@ -34,6 +34,11 @@ CAREBRIDGE_API_URL = os.environ.get(
 ).rstrip("/")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")  # optional, for voice
 
+HELP_TEXT = (
+    "Send /start to verify your Telegram username against your CareBridge victim record.\n"
+    "After verification, text and voice notes are sent to the scoring pipeline and saved as check-ins."
+)
+
 GREETING = (
     "Namaste 🙏 How are you feeling today?\n"
     "आप आज कैसा महसूस कर रहे हैं?\n\n"
@@ -46,28 +51,51 @@ CHAT_TO_VICTIM = {}
 CHAT_AWAITING_NAME = set()
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-    CHAT_AWAITING_NAME.add(chat_id)
-    args = context.args
-    if args:
-        CHAT_AWAITING_NAME.discard(chat_id)
-        CHAT_TO_VICTIM[chat_id] = args[0]
-        await update.message.reply_text(f"Linked to victim ID {args[0]}.\n\n{GREETING}")
-    else:
-        await update.message.reply_text("Please reply with the victim's full name so I can link this chat to the correct protected record.")
-
-
-async def resolve_victim_name(name: str) -> str | None:
+async def resolve_telegram_username(username: str) -> dict | None:
+    normalized = username.replace('@', '').strip()
+    if not normalized:
+        return None
     async with httpx.AsyncClient(timeout=10) as client:
         response = await client.get(
-            f"{CAREBRIDGE_API_URL}/api/database/victims/resolve",
-            params={"name": name},
+            f"{CAREBRIDGE_API_URL}/api/database/victims/resolve-telegram",
+            params={"username": normalized},
         )
         if response.status_code == 404:
             return None
         response.raise_for_status()
-        return response.json()["victim"]["id"]
+        return response.json().get("victim")
+
+
+async def validate_current_user(update: Update) -> dict | None:
+    user = update.effective_user
+    username = user.username if user else None
+    if not username:
+        return None
+    return await resolve_telegram_username(username)
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    try:
+        victim = await validate_current_user(update)
+    except Exception:
+        logger.exception("Telegram username validation failed")
+        await update.message.reply_text("I could not reach CareBridge right now. Please try again shortly.")
+        return
+    if not victim:
+        CHAT_TO_VICTIM.pop(chat_id, None)
+        await update.message.reply_text(
+            "This Telegram account is not linked to an active CareBridge victim case. "
+            "Please ask an official to add your Telegram username to your victim record, then send /start again."
+        )
+        return
+    CHAT_TO_VICTIM[chat_id] = victim["id"]
+    await update.message.reply_text(f"Verified. Your CareBridge case is linked.\n\n{GREETING}")
+
+
+async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # /link is retained only as a re-validation command; users cannot choose an arbitrary victim ID.
+    await start(update, context)
 
 
 async def transcribe_voice(file_path: str) -> str:
@@ -93,7 +121,7 @@ async def analyze_message(
     message_id: int | None,
 ) -> dict:
     """Send a Telegram check-in through the CareBridge pipeline and database."""
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
             f"{CAREBRIDGE_API_URL}/api/ingest/telegram",
             json={
@@ -111,27 +139,23 @@ async def analyze_message(
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
-    text = update.message.text
-
-    if chat_id in CHAT_AWAITING_NAME and chat_id not in CHAT_TO_VICTIM:
-        try:
-            victim_id = await resolve_victim_name(text)
-        except Exception:
-            logger.exception("Victim lookup failed")
-            await update.message.reply_text("I could not reach CareBridge right now. Please try again shortly.")
-            return
-        if not victim_id:
-            await update.message.reply_text("I could not find that victim record. Please check the full name or ask an official to add the victim first.")
-            return
-        CHAT_TO_VICTIM[chat_id] = victim_id
-        CHAT_AWAITING_NAME.discard(chat_id)
-        await update.message.reply_text(f"Your chat is linked to {victim_id}.\n\n{GREETING}")
+    text = (update.message.text or '').strip()
+    if not text:
         return
 
     victim_id = CHAT_TO_VICTIM.get(chat_id)
     if not victim_id:
-        await update.message.reply_text("Please send /start first so I can ask for the victim's name.")
-        return
+        try:
+            victim = await validate_current_user(update)
+        except Exception:
+            logger.exception("Telegram username validation failed")
+            await update.message.reply_text("I could not reach CareBridge right now. Please try again shortly.")
+            return
+        if not victim:
+            await update.message.reply_text("Your Telegram username is not linked to an active victim case. Ask an official to register it, then send /start.")
+            return
+        victim_id = victim["id"]
+        CHAT_TO_VICTIM[chat_id] = victim_id
 
     await process_and_reply(update, victim_id, text)
 
@@ -191,6 +215,7 @@ def main() -> None:
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("link", link))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
 

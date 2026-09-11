@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   VictimDashboardPayload,
-  VictimDbRecord,
   PipelineExecutionResult
 } from '../types';
 import {
@@ -19,9 +18,8 @@ import { VictimAiChat } from './VictimAiChat';
 
 interface VictimDashboardViewProps {
   payload: VictimDashboardPayload | null;
-  victims: VictimDbRecord[];
   selectedVictimId: string;
-  onVictimChange: (victimId: string) => void;
+  onLogout: () => void;
   onChatCompleted: (result: PipelineExecutionResult) => void;
   onRefresh: () => void;
   isLoading: boolean;
@@ -29,9 +27,8 @@ interface VictimDashboardViewProps {
 
 export const VictimDashboardView: React.FC<VictimDashboardViewProps> = ({
   payload,
-  victims,
   selectedVictimId,
-  onVictimChange,
+  onLogout,
   onChatCompleted,
   onRefresh,
   isLoading
@@ -40,6 +37,8 @@ export const VictimDashboardView: React.FC<VictimDashboardViewProps> = ({
   const [breathingPhase, setBreathingPhase] = useState<'Inhale' | 'Hold' | 'Exhale' | 'Pause'>('Inhale');
   const [breathingSeconds, setBreathingSeconds] = useState(4);
   const [isBreathingActive, setIsBreathingActive] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   // Box breathing interval
   useEffect(() => {
@@ -64,6 +63,17 @@ export const VictimDashboardView: React.FC<VictimDashboardViewProps> = ({
     return () => clearInterval(timer);
   }, [isBreathingActive]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedVictimId) return;
+    setAnalysisError(null);
+    fetch(`/api/analysis/victim/${encodeURIComponent(selectedVictimId)}`)
+      .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Unable to load analysis.'); return d; })
+      .then(d => { if (!cancelled) setAnalysis(d); })
+      .catch(e => { if (!cancelled) setAnalysisError(e instanceof Error ? e.message : 'Unable to load analysis.'); });
+    return () => { cancelled = true; };
+  }, [selectedVictimId, payload?.lastUpdated]);
+
   const handleCopyJson = () => {
     if (!payload) return;
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
@@ -71,17 +81,54 @@ export const VictimDashboardView: React.FC<VictimDashboardViewProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!payload) {
-    return (
-      <div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-xs text-stone-500">
-        No victim dashboard feed generated yet. Ingest a disclosure above to produce the victim dashboard view.
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
+        <div>
+          <div className="text-xs font-semibold text-stone-900">Your protected case</div>
+          <div className="text-[10px] text-stone-500">Case ID: <span className="font-mono">{selectedVictimId}</span>. Your case cannot be changed while signed in.</div>
+        </div>
+        <button type="button" onClick={onLogout} className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50">Log out</button>
+      </div>
+
+      {/* The check-in assistant starts with the dashboard. It never submits synthetic data. */}
       <VictimAiChat victimId={selectedVictimId} onCompleted={onChatCompleted} />
+
+      {analysis && (
+        <section className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div><h3 className="text-sm font-semibold text-stone-900">Your progress over time</h3><p className="text-[11px] text-stone-500">Based only on your saved check-ins and the clinician's initial score.</p></div>
+            <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-semibold text-indigo-700">{analysis.summary.direction}</span>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl bg-stone-50 p-3"><div className="text-[10px] text-stone-500">Initial score</div><div className="text-xl font-bold">{analysis.summary.checkinCount ? analysis.victim.baseline_distress_score : analysis.victim.baseline_distress_score}/100</div></div>
+            <div className="rounded-xl bg-stone-50 p-3"><div className="text-[10px] text-stone-500">Latest score</div><div className="text-xl font-bold">{analysis.summary.latestScore}/100</div></div>
+            <div className="rounded-xl bg-stone-50 p-3"><div className="text-[10px] text-stone-500">Average</div><div className="text-xl font-bold">{analysis.summary.averageScore}/100</div></div>
+            <div className="rounded-xl bg-stone-50 p-3"><div className="text-[10px] text-stone-500">Check-ins</div><div className="text-xl font-bold">{analysis.summary.checkinCount}</div></div>
+          </div>
+          <div className="mt-4 flex h-32 items-end gap-2 rounded-xl border border-stone-100 bg-stone-50 p-3">
+            <div className="h-full flex w-12 flex-col justify-end items-center"><span className="text-[9px] text-stone-500">{analysis.victim.baseline_distress_score}</span><div className="w-full rounded-t bg-indigo-300" style={{height:`${Math.max(5, Number(analysis.victim.baseline_distress_score))}%`}} /><span className="mt-1 text-[9px] text-stone-500">Doctor</span></div>
+            {analysis.history.slice(-8).map((h:any) => <div key={h.id} className="h-full flex-1 min-w-0 flex flex-col justify-end items-center" title={new Date(h.createdAt).toLocaleString()}><span className="text-[9px] text-stone-500">{h.score}</span><div className="w-full max-w-8 rounded-t bg-emerald-400" style={{height:`${Math.max(5, Number(h.score))}%`}} /><span className="mt-1 max-w-full truncate text-[8px] text-stone-400">{new Date(h.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span></div>)}
+          </div>
+          {analysis.victim.doctor_name && <p className="mt-2 text-[10px] text-stone-500">Initial assessment by {analysis.victim.doctor_name}. {analysis.victim.doctor_notes || ''}</p>}
+        </section>
+      )}
+      {analysisError && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{analysisError}</div>}
+
+      {!payload && (
+        <div className="rounded-2xl border border-emerald-100 bg-white p-6 text-center shadow-sm">
+          <div className="mx-auto max-w-lg">
+            <h3 className="text-sm font-semibold text-stone-900">Your check-in space is ready</h3>
+            <p className="mt-2 text-xs leading-6 text-stone-500">
+              There is no previous assessment for this case yet. Send a real check-in above to start the pipeline.
+              Your message is screened, scored, classified, and saved to the database.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {payload && (
+        <>
       {/* Header & Endpoint Tag */}
       <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -97,12 +144,6 @@ export const VictimDashboardView: React.FC<VictimDashboardViewProps> = ({
               ID: {payload.victimId}
             </span>
           </h3>
-          <label className="mt-3 flex items-center gap-2 text-xs text-stone-500">
-            Victim record
-            <select value={selectedVictimId} onChange={event => onVictimChange(event.target.value)} className="rounded-lg border border-stone-200 bg-white px-2 py-1 font-mono text-[11px] text-stone-700">
-              {victims.map(victim => <option key={victim.id} value={victim.id}>{victim.name} ({victim.id})</option>)}
-            </select>
-          </label>
           <p className="text-xs text-stone-500">
             Dignifying, calm, and protective interface presented directly to the affected individual
           </p>
@@ -252,6 +293,8 @@ export const VictimDashboardView: React.FC<VictimDashboardViewProps> = ({
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

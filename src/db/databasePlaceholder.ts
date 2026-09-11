@@ -1,8 +1,8 @@
-import { VictimDbRecord, CheckinDbRecord, RiskLevel } from '../types';
+import { VictimDbRecord, CheckinDbRecord, RiskLevel, OfficialDbRecord } from '../types';
 
 /**
  * ============================================================================
- * DATABASE PLACEHOLDER FOR VICTIMS AND CHECKINS
+ * DATABASE SCHEMAS: OFFICIALS, VICTIMS AND CHECKINS
  * ============================================================================
  * 
  * Victims Schema:
@@ -29,11 +29,18 @@ export interface IDatabaseAdapter {
   connect?(): Promise<void>;
   disconnect?(): Promise<void>;
 
+  // Officials table operations
+  getOfficialByUsername(username: string): Promise<OfficialDbRecord | null>;
+  listOfficials(): Promise<OfficialDbRecord[]>;
+  createOfficial(official: OfficialDbRecord, passwordHash: string): Promise<OfficialDbRecord>;
+
   // Victims table operations: victims (id, name, case_id, risk_level, latest_score)
   getVictim(id: string): Promise<VictimDbRecord | null>;
   upsertVictim(victim: VictimDbRecord): Promise<VictimDbRecord>;
   listVictims(): Promise<VictimDbRecord[]>;
   updateVictimScore(id: string, risk_level: RiskLevel | string, latest_score: number): Promise<void>;
+  closeVictim(id: string, closedBy: string): Promise<VictimDbRecord | null>;
+  getVictimByTelegramUsername?(username: string): Promise<VictimDbRecord | null>;
 
   // Checkins table operations: checkins (id, victim_id, message, score, risk_category, trigger_factors, created_at)
   insertCheckin(checkin: CheckinDbRecord): Promise<CheckinDbRecord>;
@@ -41,15 +48,15 @@ export interface IDatabaseAdapter {
   listCheckins(limit?: number): Promise<CheckinDbRecord[]>;
 }
 
-/** Exact PostgREST query formats used by NeonRestAdapter. */
+/** SQL operations used by the live Neon PostgreSQL adapter. */
 export const NEON_REST_QUERY_EXAMPLES = {
-  listVictims: 'GET /victims?select=id,name,case_id,risk_level,latest_score&order=latest_score.desc',
-  getVictim: 'GET /victims?id=eq.{victimId}&select=id,name,case_id,risk_level,latest_score&limit=1',
-  upsertVictim: 'POST /victims?on_conflict=id (Prefer: resolution=merge-duplicates,return=representation)',
-  updateVictimScore: 'PATCH /victims?id=eq.{victimId} (body: { risk_level, latest_score })',
-  listCheckins: 'GET /checkins?select=id,victim_id,message,score,risk_category,trigger_factors,created_at&order=created_at.desc&limit={limit}',
-  listVictimCheckins: 'GET /checkins?victim_id=eq.{victimId}&select=id,victim_id,message,score,risk_category,trigger_factors,created_at&order=created_at.desc&limit={limit}',
-  insertCheckin: 'POST /checkins (body: { id, victim_id, message, score, risk_category, trigger_factors, created_at })'
+  listVictims: 'SELECT id,name,case_id,risk_level,latest_score FROM victims ORDER BY latest_score DESC',
+  getVictim: 'SELECT ... FROM victims WHERE id = $1 LIMIT 1',
+  upsertVictim: 'INSERT INTO victims ... ON CONFLICT (id) DO UPDATE ...',
+  updateVictimScore: 'UPDATE victims SET risk_level = $2, latest_score = $3 WHERE id = $1',
+  listCheckins: 'SELECT ... FROM checkins ORDER BY created_at DESC LIMIT $1',
+  listVictimCheckins: 'SELECT ... FROM checkins WHERE victim_id = $1 ORDER BY created_at DESC LIMIT $2',
+  insertCheckin: 'INSERT INTO checkins (id,victim_id,message,score,risk_category,trigger_factors,created_at) VALUES (...)'
 } as const;
 
 /**
@@ -60,6 +67,16 @@ export const SQL_SCHEMA_PLACEHOLDER = `
 -- SQL DDL SCHEMA: victims and checkins
 -- Supports PostgreSQL, MySQL, or SQLite
 -- ============================================================================
+
+CREATE TABLE IF NOT EXISTS officials (
+  id VARCHAR(255) PRIMARY KEY,
+  username VARCHAR(255) NOT NULL UNIQUE,
+  display_name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL DEFAULT 'sub_official',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE IF NOT EXISTS victims (
   id VARCHAR(255) PRIMARY KEY,
@@ -77,6 +94,7 @@ CREATE TABLE IF NOT EXISTS checkins (
   score NUMERIC(5, 2) NOT NULL,
   risk_category VARCHAR(50) NOT NULL,
   trigger_factors JSON NOT NULL DEFAULT ('[]'),
+  ingestion_channel VARCHAR(50) NOT NULL DEFAULT 'victim_dashboard',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_victim FOREIGN KEY (victim_id) REFERENCES victims(id) ON DELETE CASCADE
 );
@@ -132,6 +150,10 @@ model Victim {
   case_id      String
   risk_level   String
   latest_score Float
+  baseline_distress_score Float
+  doctor_initial_score Float
+  doctor_name String
+  doctor_notes String
   checkins     Checkin[]
 
   @@map("victims")
@@ -154,204 +176,27 @@ model Checkin {
 `;
 
 /**
- * Concrete Database Placeholder Adapter.
- * 
- * Provides an in-memory simulation for immediate development and testing,
- * while containing explicit placeholders and TODO comments for wiring up
- * PostgreSQL (pg / Knex / Drizzle), MongoDB, Firestore, or any SQL database.
+ * Fallback adapter used only to fail closed when no external database is configured.
+ * It never stores sample or transient application data.
  */
 export class DatabasePlaceholderAdapter implements IDatabaseAdapter {
-  public name = 'Placeholder Database Adapter (Ready for PostgreSQL/MongoDB/Firestore)';
-  private connected = true;
+  public name = 'Database Not Configured';
+  private connected = false;
 
-  // In-memory backing stores for local execution until external database is connected
-  private victimsStore = new Map<string, VictimDbRecord>();
-  private checkinsStore = new Map<string, CheckinDbRecord[]>();
-
-  constructor() {
-    this.seedDefaultData();
-  }
-
-  private seedDefaultData() {
-    // Seed initial victims with the exact required schema:
-    // (id, name, case_id, risk_level, latest_score)
-    const initialVictims: VictimDbRecord[] = [
-      {
-        id: 'VIC-CONFLICT-701',
-        name: 'Olena Shevchenko',
-        case_id: 'CASE-UA-2026-044',
-        risk_level: 'Medium',
-        latest_score: 42
-      },
-      {
-        id: 'VIC-DETENTION-802',
-        name: 'Farid Al-Mansoor',
-        case_id: 'CASE-SY-2026-118',
-        risk_level: 'High',
-        latest_score: 58
-      },
-      {
-        id: 'VIC-BORDER-903',
-        name: 'Marie Claire Diallo',
-        case_id: 'CASE-CG-2026-892',
-        risk_level: 'High',
-        latest_score: 61
-      }
-    ];
-
-    for (const v of initialVictims) {
-      this.victimsStore.set(v.id, v);
-      this.checkinsStore.set(v.id, [
-        {
-          id: `CHK-INIT-${v.id}`,
-          victim_id: v.id,
-          message: 'Intake wellness check-in completed during field registration.',
-          score: v.latest_score,
-          risk_category: v.risk_level,
-          trigger_factors: ['displacement', 'intake_assessment'],
-          created_at: new Date(Date.now() - 86400000).toISOString()
-        }
-      ]);
-    }
-  }
-
-  isConnected(): boolean {
-    return this.connected;
-  }
-
-  async connect(): Promise<void> {
-    // ========================================================================
-    // TODO: PLACEHOLDER FOR EXTERNAL DATABASE CONNECTION
-    // Example (PostgreSQL):
-    //   this.pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
-    //   await this.pgPool.query('SELECT 1');
-    // Example (MongoDB):
-    //   await mongoose.connect(process.env.MONGODB_URI);
-    // ========================================================================
-    this.connected = true;
-    console.log('[DatabaseAdapter] Connected to Database Placeholder Adapter');
-  }
-
-  async disconnect(): Promise<void> {
-    // TODO: Disconnect pool or client
-    this.connected = false;
-  }
-
-  // ==========================================================================
-  // VICTIMS TABLE: (id, name, case_id, risk_level, latest_score)
-  // ==========================================================================
-
-  async getVictim(id: string): Promise<VictimDbRecord | null> {
-    // ========================================================================
-    // TODO: SQL IMPLEMENTATION PLACEHOLDER:
-    // const res = await pool.query('SELECT id, name, case_id, risk_level, latest_score FROM victims WHERE id = $1', [id]);
-    // return res.rows[0] || null;
-    // ========================================================================
-    const victim = this.victimsStore.get(id);
-    return victim ? { ...victim } : null;
-  }
-
-  async upsertVictim(victim: VictimDbRecord): Promise<VictimDbRecord> {
-    // ========================================================================
-    // TODO: SQL IMPLEMENTATION PLACEHOLDER:
-    // const query = `
-    //   INSERT INTO victims (id, name, case_id, risk_level, latest_score)
-    //   VALUES ($1, $2, $3, $4, $5)
-    //   ON CONFLICT (id) DO UPDATE SET
-    //     name = EXCLUDED.name,
-    //     case_id = EXCLUDED.case_id,
-    //     risk_level = EXCLUDED.risk_level,
-    //     latest_score = EXCLUDED.latest_score
-    //   RETURNING *;
-    // `;
-    // const res = await pool.query(query, [victim.id, victim.name, victim.case_id, victim.risk_level, victim.latest_score]);
-    // return res.rows[0];
-    // ========================================================================
-    this.victimsStore.set(victim.id, { ...victim });
-    if (!this.checkinsStore.has(victim.id)) {
-      this.checkinsStore.set(victim.id, []);
-    }
-    return { ...victim };
-  }
-
-  async listVictims(): Promise<VictimDbRecord[]> {
-    // ========================================================================
-    // TODO: SQL IMPLEMENTATION PLACEHOLDER:
-    // const res = await pool.query('SELECT id, name, case_id, risk_level, latest_score FROM victims ORDER BY latest_score DESC');
-    // return res.rows;
-    // ========================================================================
-    return Array.from(this.victimsStore.values()).map(v => ({ ...v }));
-  }
-
-  async updateVictimScore(id: string, risk_level: RiskLevel | string, latest_score: number): Promise<void> {
-    // ========================================================================
-    // TODO: SQL IMPLEMENTATION PLACEHOLDER:
-    // await pool.query('UPDATE victims SET risk_level = $1, latest_score = $2 WHERE id = $3', [risk_level, latest_score, id]);
-    // ========================================================================
-    const victim = this.victimsStore.get(id);
-    if (victim) {
-      victim.risk_level = risk_level;
-      victim.latest_score = latest_score;
-      this.victimsStore.set(id, victim);
-    }
-  }
-
-  // ==========================================================================
-  // CHECKINS TABLE: (id, victim_id, message, score, risk_category, trigger_factors, created_at)
-  // ==========================================================================
-
-  async insertCheckin(checkin: CheckinDbRecord): Promise<CheckinDbRecord> {
-    // ========================================================================
-    // TODO: SQL IMPLEMENTATION PLACEHOLDER:
-    // const query = `
-    //   INSERT INTO checkins (id, victim_id, message, score, risk_category, trigger_factors, created_at)
-    //   VALUES ($1, $2, $3, $4, $5, $6, $7)
-    //   RETURNING *;
-    // `;
-    // const res = await pool.query(query, [
-    //   checkin.id, checkin.victim_id, checkin.message, checkin.score,
-    //   checkin.risk_category, JSON.stringify(checkin.trigger_factors), checkin.created_at
-    // ]);
-    // return res.rows[0];
-    // ========================================================================
-    let list = this.checkinsStore.get(checkin.victim_id);
-    if (!list) {
-      list = [];
-      this.checkinsStore.set(checkin.victim_id, list);
-    }
-    list.unshift({ ...checkin });
-    return { ...checkin };
-  }
-
-  async getCheckinsForVictim(victim_id: string, limit = 50): Promise<CheckinDbRecord[]> {
-    // ========================================================================
-    // TODO: SQL IMPLEMENTATION PLACEHOLDER:
-    // const res = await pool.query(
-    //   'SELECT id, victim_id, message, score, risk_category, trigger_factors, created_at FROM checkins WHERE victim_id = $1 ORDER BY created_at DESC LIMIT $2',
-    //   [victim_id, limit]
-    // );
-    // return res.rows;
-    // ========================================================================
-    const list = this.checkinsStore.get(victim_id) || [];
-    return list.slice(0, limit).map(c => ({ ...c }));
-  }
-
-  async listCheckins(limit = 100): Promise<CheckinDbRecord[]> {
-    // ========================================================================
-    // TODO: SQL IMPLEMENTATION PLACEHOLDER:
-    // const res = await pool.query(
-    //   'SELECT id, victim_id, message, score, risk_category, trigger_factors, created_at FROM checkins ORDER BY created_at DESC LIMIT $1',
-    //   [limit]
-    // );
-    // return res.rows;
-    // ========================================================================
-    const all: CheckinDbRecord[] = [];
-    for (const list of this.checkinsStore.values()) {
-      all.push(...list);
-    }
-    all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    return all.slice(0, limit);
-  }
+  isConnected(): boolean { return false; }
+  async connect(): Promise<void> { throw new Error('No database is configured. Set DATABASE_URL to a Neon PostgreSQL connection string.'); }
+  async disconnect(): Promise<void> { this.connected = false; }
+  private unavailable(): never { throw new Error('No database is configured. Set DATABASE_URL to a Neon PostgreSQL connection string.'); }
+  async getOfficialByUsername(_username: string): Promise<OfficialDbRecord | null> { return this.unavailable(); }
+  async listOfficials(): Promise<OfficialDbRecord[]> { return this.unavailable(); }
+  async createOfficial(_official: OfficialDbRecord, _passwordHash: string): Promise<OfficialDbRecord> { return this.unavailable(); }
+  async getVictim(_id: string): Promise<VictimDbRecord | null> { return this.unavailable(); }
+  async upsertVictim(_victim: VictimDbRecord): Promise<VictimDbRecord> { return this.unavailable(); }
+  async listVictims(): Promise<VictimDbRecord[]> { return this.unavailable(); }
+  async updateVictimScore(_id: string, _risk_level: RiskLevel | string, _latest_score: number): Promise<void> { return this.unavailable(); }
+  async insertCheckin(_checkin: CheckinDbRecord): Promise<CheckinDbRecord> { return this.unavailable(); }
+  async getCheckinsForVictim(_victim_id: string, _limit = 50): Promise<CheckinDbRecord[]> { return this.unavailable(); }
+  async listCheckins(_limit = 100): Promise<CheckinDbRecord[]> { return this.unavailable(); }
 }
 
 // Global placeholder singleton

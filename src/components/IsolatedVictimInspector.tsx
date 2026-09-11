@@ -60,6 +60,7 @@ export const IsolatedVictimInspector: React.FC<IsolatedVictimInspectorProps> = (
   const [newCaseId, setNewCaseId] = useState('');
   const [newRiskLevel, setNewRiskLevel] = useState<RiskLevel>('Low');
   const [newLatestScore, setNewLatestScore] = useState<number>(35);
+  const [newPassword, setNewPassword] = useState('');
 
   const fetchVictimData = async (vId: string) => {
     setIsLoading(true);
@@ -144,7 +145,8 @@ export const IsolatedVictimInspector: React.FC<IsolatedVictimInspectorProps> = (
           name: newName.trim(),
           case_id: newCaseId.trim() || `CASE-${newVictimId.trim().replace(/[^a-zA-Z0-9]/g, '')}`,
           risk_level: newRiskLevel,
-          latest_score: newLatestScore
+          latest_score: newLatestScore,
+          password: newPassword
         })
       });
 
@@ -166,6 +168,7 @@ export const IsolatedVictimInspector: React.FC<IsolatedVictimInspectorProps> = (
       setNewVictimId('');
       setNewName('');
       setNewCaseId('');
+      setNewPassword('');
     } catch (err) {
       console.error('Failed to register victim:', err);
     }
@@ -690,7 +693,7 @@ setDatabaseAdapter(new PostgresDatabaseAdapter());`}
                   type="text"
                   value={newVictimId}
                   onChange={e => setNewVictimId(e.target.value)}
-                  placeholder="e.g. VIC-CONFLICT-904"
+                  placeholder="e.g. VICTIM-ID-FROM-DATABASE"
                   required
                   className="w-full px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 text-stone-200 focus:outline-none focus:border-emerald-500 font-mono"
                 />
@@ -716,6 +719,19 @@ setDatabaseAdapter(new PostgresDatabaseAdapter());`}
                   onChange={e => setNewCaseId(e.target.value)}
                   placeholder="e.g. CASE-UA-2026-904"
                   className="w-full px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 text-stone-200 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-stone-400 mb-1">victim access password:</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                  minLength={8}
+                  required
+                  className="w-full px-3 py-2 rounded-lg bg-stone-900 border border-stone-700 text-stone-200 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
