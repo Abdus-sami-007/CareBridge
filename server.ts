@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
-import net from 'node:net';
 import crypto from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'path';
@@ -103,7 +102,8 @@ function startTelegramBot(port: number): void {
   const botEnv = {
     ...process.env,
     BOT_TOKEN: token,
-    CAREBRIDGE_API_URL: process.env.CAREBRIDGE_API_URL || `http://127.0.0.1:${port}`,
+    CAREBRIDGE_API_URL:
+      process.env.CAREBRIDGE_API_URL || `http://127.0.0.1:${port}`,
   };
 
   console.log(`[Telegram] Starting bot automatically with ${pythonCommand}...`);
@@ -134,22 +134,6 @@ function stopTelegramBot(): void {
   console.log('[Telegram] Stopping bot...');
   telegramBotProcess.kill('SIGTERM');
   telegramBotProcess = null;
-}
-
-async function findAvailablePort(preferredPort: number): Promise<number> {
-  for (let port = preferredPort; port < preferredPort + 20; port += 1) {
-    const available = await new Promise<boolean>(resolve => {
-      const probe = net.createServer();
-      probe.once('error', () => resolve(false));
-      probe.listen(port, '0.0.0.0', () => {
-        probe.close(() => resolve(true));
-      });
-    });
-
-    if (available) return port;
-  }
-
-  throw new Error(`No available port found near ${preferredPort}`);
 }
 
 // Helper function to process an incoming text disclosure through the filter & AI scoring
@@ -481,13 +465,19 @@ async function getDatabaseOfficialsFeed(): Promise<OfficialsDashboardPayload[]> 
 
 async function startServer() {
   const app = express();
-  const preferredPort = Number(process.env.PORT || 3000);
-  const PORT = await findAvailablePort(preferredPort);
-  const runningCompiledServer = path.basename(path.dirname(process.argv[1] || '')) === 'dist';
-  const isProduction = process.env.NODE_ENV === 'production' || runningCompiledServer;
 
-  if (PORT !== preferredPort) {
-    console.warn(`[CareBridge] Port ${preferredPort} is busy; using port ${PORT}.`);
+  // The hosting platform supplies PORT.
+  // Local development falls back to 3000.
+  const PORT = Number(process.env.PORT || 3000);
+
+  const runningCompiledServer =
+    path.basename(path.dirname(process.argv[1] || '')) === 'dist';
+
+  const isProduction =
+    process.env.NODE_ENV === 'production' || runningCompiledServer;
+
+  if (!Number.isInteger(PORT) || PORT <= 0 || PORT > 65535) {
+    throw new Error(`Invalid PORT value: ${process.env.PORT}`);
   }
 
   if (isNeonPostgresConfigured()) {
@@ -1417,8 +1407,6 @@ app.use('/api', (req, res) => {
   });
 });
 
-// Vite middleware in dev, static file server in prod
-if (!isProduction) {
   // Vite middleware in dev, static file server in prod
   if (!isProduction) {
     const vite = await createViteServer({
@@ -1435,7 +1423,9 @@ if (!isProduction) {
   }
 
   const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Atrocity Mental Health Distress Prediction Module] Server online at http://localhost:${PORT}`);
+    console.log(
+      `[CareBridge] Server listening on 0.0.0.0:${PORT}`
+    );
     startTelegramBot(PORT);
   });
 

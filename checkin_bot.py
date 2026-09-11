@@ -30,8 +30,16 @@ if missing:
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CAREBRIDGE_API_URL = os.environ.get(
-    "CAREBRIDGE_API_URL", "http://localhost:3000"
-).rstrip("/")
+    "CAREBRIDGE_API_URL"
+)
+
+if not CAREBRIDGE_API_URL:
+    raise SystemExit(
+        "CAREBRIDGE_API_URL is required. "
+        "Set it to the internal CareBridge server URL."
+    )
+
+CAREBRIDGE_API_URL = CAREBRIDGE_API_URL.rstrip("/")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")  # optional, for voice
 
 HELP_TEXT = (

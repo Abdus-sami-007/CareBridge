@@ -16,7 +16,7 @@ export const PipelineApiDocs: React.FC = () => {
       method: 'POST',
       path: '/api/pipeline/process',
       description: 'Executes the complete pipeline: Ingestion -> AI Engine (NLP+Emotion+Voice) -> Dynamic Distress Score -> Trend & Prediction -> Risk Classification (Low/Med Monitoring vs High/Critical Alert & Human Intervention). Enforces strict victim isolation.',
-      curl: `curl -X POST http://localhost:3000/api/pipeline/process \\
+      curl: `curl -X POST "$CAREBRIDGE_URL/api/pipeline/process" \\
   -H "Content-Type: application/json" \\
   -d '{
     "victimId": "YOUR_VICTIM_ID",
@@ -57,7 +57,7 @@ export const PipelineApiDocs: React.FC = () => {
       method: 'POST',
       path: '/api/pipeline/periodic-check',
       description: 'Triggers the scheduled or automated periodic check node in the flowchart for a specific isolated victim.',
-      curl: `curl -X POST http://localhost:3000/api/pipeline/periodic-check \\
+      curl: `curl -X POST "$CAREBRIDGE_URL/api/pipeline/periodic-check" \\
   -H "Content-Type: application/json" \\
   -d '{
     "victimId": "YOUR_VICTIM_ID",
@@ -71,28 +71,28 @@ export const PipelineApiDocs: React.FC = () => {
       method: 'GET',
       path: '/api/pipeline/victims/:victimId/conversations',
       description: 'Fetches strictly isolated historical conversation turns for the specified victim from the database vault.',
-      curl: `curl -s http://localhost:3000/api/pipeline/victims/{victimId}/conversations`
+      curl: `curl -s "$CAREBRIDGE_URL/api/pipeline/victims/{victimId}/conversations"`
     },
     {
       title: '4. Fetch Victim Profile from Database',
       method: 'GET',
       path: '/api/pipeline/victims/:victimId',
       description: 'Fetches the isolated victim profile, trauma background, caseworker allocation, and baseline metrics from the database.',
-      curl: `curl -s http://localhost:3000/api/pipeline/victims/{victimId}`
+      curl: `curl -s "$CAREBRIDGE_URL/api/pipeline/victims/{victimId}"`
     },
     {
       title: '5. Dynamic Distress Score History & Trend',
       method: 'GET',
       path: '/api/pipeline/victims/:victimId/trend',
       description: 'Retrieves the historical distress score data points exclusively for this victim to evaluate trend trajectory.',
-      curl: `curl -s http://localhost:3000/api/pipeline/victims/{victimId}/trend`
+      curl: `curl -s "$CAREBRIDGE_URL/api/pipeline/victims/{victimId}/trend"`
     },
     {
       title: '6. Register New Victim in Database',
       method: 'POST',
       path: '/api/pipeline/victims',
       description: 'Registers a new isolated victim record in the database.',
-      curl: `curl -X POST http://localhost:3000/api/pipeline/victims \\
+      curl: `curl -X POST "$CAREBRIDGE_URL/api/pipeline/victims" \\
   -H "Content-Type: application/json" \\
   -d '{
     "victimId": "<VICTIM_ID_FROM_DATABASE>",
@@ -107,21 +107,21 @@ export const PipelineApiDocs: React.FC = () => {
       method: 'GET',
       path: '/api/pipeline/database-status',
       description: 'Inspects current database adapter status and extension readiness for external database integration in the next iteration.',
-      curl: `curl -s http://localhost:3000/api/pipeline/database-status`
+      curl: `curl -s "$CAREBRIDGE_URL/api/pipeline/database-status"`
     },
     {
       title: '8. Query Victims Database: (id, name, case_id, risk_level, latest_score)',
       method: 'GET',
       path: '/api/database/victims',
       description: 'Fetches all registered victims with their latest dynamic distress score and risk level from the database.',
-      curl: `curl -s http://localhost:3000/api/database/victims`
+      curl: `curl -s "$CAREBRIDGE_URL/api/database/victims"`
     },
     {
       title: '9. Create / Update Victim in Database',
       method: 'POST',
       path: '/api/database/victims',
       description: 'Creates or updates a victim in the database matching schema: (id, name, case_id, risk_level, latest_score).',
-      curl: `curl -X POST http://localhost:3000/api/database/victims \\
+      curl: `curl -X POST "$CAREBRIDGE_URL/api/database/victims" \\
   -H "Content-Type: application/json" \\
   -d '{
     "id": "YOUR_VICTIM_ID",
@@ -136,14 +136,14 @@ export const PipelineApiDocs: React.FC = () => {
       method: 'GET',
       path: '/api/database/checkins?victim_id=:victimId',
       description: 'Retrieves all persisted check-ins for a victim, ordered chronologically by created_at.',
-      curl: `curl -s "http://localhost:3000/api/database/checkins?victim_id={victimId}"`
+      curl: `curl -s "$CAREBRIDGE_URL/api/database/checkins?victim_id={victimId}"`
     },
     {
       title: '11. Record Manual Check-in to Database',
       method: 'POST',
       path: '/api/database/checkins',
       description: 'Records a new check-in and automatically updates the victim latest_score and risk_level.',
-      curl: `curl -X POST http://localhost:3000/api/database/checkins \\
+      curl: `curl -X POST "$CAREBRIDGE_URL/api/database/checkins" \\
   -H "Content-Type: application/json" \\
   -d '{
     "victim_id": "{victimId}",
@@ -158,7 +158,7 @@ export const PipelineApiDocs: React.FC = () => {
       method: 'GET',
       path: '/api/database/schemas',
       description: 'Returns ready-to-run SQL DDL for PostgreSQL/MySQL/SQLite and Mongoose/Prisma schemas.',
-      curl: `curl -s http://localhost:3000/api/database/schemas`
+      curl: `curl -s "$CAREBRIDGE_URL/api/database/schemas"`
     }
   ];
 
