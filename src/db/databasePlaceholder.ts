@@ -194,6 +194,7 @@ export class DatabasePlaceholderAdapter implements IDatabaseAdapter {
   async upsertVictim(_victim: VictimDbRecord): Promise<VictimDbRecord> { return this.unavailable(); }
   async listVictims(): Promise<VictimDbRecord[]> { return this.unavailable(); }
   async updateVictimScore(_id: string, _risk_level: RiskLevel | string, _latest_score: number): Promise<void> { return this.unavailable(); }
+  async closeVictim(_id: string, _closedBy: string): Promise<VictimDbRecord | null> { return this.unavailable(); }
   async insertCheckin(_checkin: CheckinDbRecord): Promise<CheckinDbRecord> { return this.unavailable(); }
   async getCheckinsForVictim(_victim_id: string, _limit = 50): Promise<CheckinDbRecord[]> { return this.unavailable(); }
   async listCheckins(_limit = 100): Promise<CheckinDbRecord[]> { return this.unavailable(); }
