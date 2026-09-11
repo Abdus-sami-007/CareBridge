@@ -46,15 +46,64 @@ export default function App() {
   }, []);
 
   const loadVictims = async () => {
-    try {
-      const response = await fetch('/api/database/victims');
-      if (!response.ok) throw new Error('Failed to load victim records.');
-      const data = await response.json();
-      setVictims(data.victims || []);
-    } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : 'Failed to load victim records.');
+  try {
+    setDashboardError(null);
+
+    const response = await fetch('/api/database/victims', {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+
+    // Never attempt response.json() on an HTML response.
+    if (!contentType.toLowerCase().includes('application/json')) {
+      const text = await response.text();
+
+      console.error(
+        '[Victims API] Expected JSON but received:',
+        response.status,
+        contentType,
+        text.substring(0, 300)
+      );
+
+      throw new Error(
+        response.status === 404
+          ? 'Victim API endpoint was not found. Make sure the CareBridge server is running.'
+          : 'Victim API returned an invalid response. Make sure the backend is running.'
+      );
     }
-  };
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        typeof data?.error === 'string'
+          ? data.error
+          : 'Failed to load victim records.'
+      );
+    }
+
+    if (!Array.isArray(data?.victims)) {
+      throw new Error('Victim API returned an invalid data format.');
+    }
+
+    setVictims(data.victims);
+  } catch (error) {
+    console.error('[Victims API]', error);
+
+    setVictims([]);
+
+    setDashboardError(
+      error instanceof Error
+        ? error.message
+        : 'Failed to load victim records.'
+    );
+  }
+};
 
   useEffect(() => {
     loadVictims();
