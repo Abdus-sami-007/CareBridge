@@ -319,7 +319,7 @@ async function fetchJson<T>(
                 <button onClick={async()=>{await fetch('/api/official-auth/logout',{method:'POST',headers:{Authorization:`Bearer ${officialSession.token}`}});setOfficialSession(null);setOfficialsRecords([])}} className="rounded-xl border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700">Log out</button>
               </div>
               {officialSession.role === 'admin' && <OfficialsAccountManager token={officialSession.token} isAdmin={true} />}
-              <OfficialsVictimManager victims={victims} isAdmin={true} authToken={officialSession.token} onSaved={() => { loadVictims(); loadDashboardData(); }} />
+              <OfficialsVictimManager victims={victims} canManageVictims={true} authToken={officialSession.token} onSaved={() => { loadVictims(); loadDashboardData(); }} />
               <OfficialsDashboardView records={officialsRecords} onRefresh={loadDashboardData} isLoading={dashboardLoading} authToken={officialSession.token} />
             </>}
           </div>

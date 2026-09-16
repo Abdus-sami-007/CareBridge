@@ -178,33 +178,77 @@ async function processDisclosure(
         }
       });
 
-      const systemPrompt = `You are a specialized clinical AI trauma assessment module within the "AI-Powered Dynamic Mental Health Monitoring and Distress Prediction System for Victims of Atrocities".
-You evaluate input originating from multiple channels (Victim Dashboard, WhatsApp bot, Telegram bot, IVR telephony, or Speech-to-text) regarding victims of armed conflict, state violence, ethnic persecution, displacement, and atrocities.
-The text has already been filtered and sanitized to redact personal identifiers and private locations.
+      const previousCheckins = await database.getCheckinsForVictim(
+        victimId,
+        12
+      );
 
-Your task:
-Analyze this filtered disclosure from an atrocity victim and evaluate:
-1. Overall Trauma Severity Impact Score (0 to 100)
-2. Acute Distress & Arousal Score (0 to 100)
-3. Resilience, Agency & Insight Score (0 to 100)
-4. Urgency Tier: Mild, Moderate, High, Severe / Crisis
-5. PCL-5 Symptom Clusters: Intrusion, Avoidance, Negative Cognition/Mood, Hyperarousal
-6. Objective Clinical Observations for Officials & Caseworkers
-7. An Empathetic, Dignifying Feedback Message tailored for the Victim's Dashboard (avoid medical jargon, provide warmth, safety, and validation)
-8. Immediate Grounding & Somatic Stabilization Exercises
-9. Recommended Care Pathway for Officials and Support Facilitators.`;
+      const previousCheckinsSnippet = previousCheckins.length > 0
+        ? previousCheckins
+            .map(
+              (c, index) =>
+                `Check-in ${index + 1} (${c.created_at}) ` +
+                `[${(c.ingestion_channel || 'unknown').toUpperCase()}]: ` +
+                `${c.message} | ` +
+                `previous stress estimate=${c.score}/100 | ` +
+                `risk=${c.risk_category}`
+            )
+            .join('\n')
+        : 'No previous check-ins are available for this victim.';
 
-      const prompt = `SOURCE CHANNEL: ${channel.toUpperCase()}
-VICTIM IDENTIFIER HASH: ${victimId}
-FILTERED TRAUMA NARRATIVE:
+      const systemPrompt = `You are the CareBridge AI stress-analysis engine.
+
+You analyze one registered victim across multiple channels:
+Victim Dashboard, Telegram, WhatsApp, IVR and speech transcripts.
+
+The input has already been sanitized.
+
+NEVER mix information from another victim.
+
+Your output is an evidence-based stress estimate, NOT a medical diagnosis.
+
+STRESS SCORE:
+0-24   = Minimal
+25-49  = Mild
+50-74  = Elevated / High
+75-100 = Severe / Critical
+
+SCORING REQUIREMENTS:
+- Analyze the current disclosure.
+- Consider the victim's previous check-ins.
+- Previous scores are context only.
+- Do NOT copy the previous score.
+- Look for explicit emotional distress, fear, anxiety, panic,
+  sleep disturbance, intrusive memories, avoidance, hopelessness,
+  agitation, functional impact and safety indicators.
+- Compare the current state with this victim's own history.
+- Do not infer stress from demographics.
+- If evidence is insufficient, keep the estimate conservative
+  and explain uncertainty.
+- Immediate safety/crisis indicators must increase urgency.
+
+CURRENT CHANNEL:
+${channel}
+
+PREVIOUS CHECK-INS FOR THIS SAME VICTIM:
+${previousCheckinsSnippet}`;
+
+      const prompt = `CURRENT FILTERED DISCLOSURE:
+
 """
 ${filterResult.filteredText}
 """
 
-PRE-FILTER SAFETY DATA:
-- Crisis Status: ${filterResult.crisisDetection.severity}
-- Detected Categories: ${filterResult.traumaTags.map(t => t.label).join(', ') || 'General Atrocity Trauma'}
-- Sanitized Entities: ${filterResult.redactedCount}
+SAFETY INFORMATION:
+- Crisis status: ${filterResult.crisisDetection.severity}
+- Crisis reasons: ${
+  filterResult.crisisDetection.reasons.join('; ') || 'None'
+}
+- Detected categories:
+${
+  filterResult.traumaTags.map(t => t.label).join(', ') ||
+  'General stress'
+}
 
 Return the structured assessment JSON.`;
 

@@ -5,11 +5,11 @@ import { VictimDbRecord } from '../types';
 interface OfficialsVictimManagerProps {
   victims: VictimDbRecord[];
   onSaved: () => void;
-  isAdmin: boolean;
+  canManageVictims: boolean;
   authToken: string;
 }
 
-export const OfficialsVictimManager: React.FC<OfficialsVictimManagerProps> = ({ victims, onSaved, isAdmin, authToken }) => {
+export const OfficialsVictimManager: React.FC<OfficialsVictimManagerProps> = ({ victims, onSaved, canManageVictims, authToken }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [id, setId] = useState('');
@@ -69,10 +69,12 @@ export const OfficialsVictimManager: React.FC<OfficialsVictimManagerProps> = ({ 
           <div className="rounded-xl bg-sky-100 p-2 text-sky-700"><Database className="h-5 w-5" /></div>
           <div>
             <h3 className="text-sm font-semibold text-stone-900">Victim Records</h3>
-            <p className="text-xs text-stone-500">Create a case with its clinician baseline before monitoring begins.</p>
+            <p className="text-xs text-stone-500">
+              Create or update a case before monitoring begins.
+            </p>
           </div>
         </div>
-        {isAdmin && <button type="button" onClick={() => { if (isOpen) resetForm(); else setIsOpen(true); }} className="inline-flex items-center gap-1.5 rounded-xl bg-sky-700 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-600">
+        {canManageVictims && <button type="button" onClick={() => { if (isOpen) resetForm(); else setIsOpen(true); }} className="inline-flex items-center gap-1.5 rounded-xl bg-sky-700 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-600">
           {editingId ? <Pencil className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />} {editingId ? 'Edit Victim' : 'Add Victim'}
         </button>}
       </div>
@@ -83,7 +85,7 @@ export const OfficialsVictimManager: React.FC<OfficialsVictimManagerProps> = ({ 
           <input required value={name} onChange={event => setName(event.target.value)} placeholder="Full name" className="rounded-lg border border-stone-200 px-3 py-2 text-xs" />
           <input required value={caseId} onChange={event => setCaseId(event.target.value)} placeholder="Case ID" className="rounded-lg border border-stone-200 px-3 py-2 text-xs" />
           <input required={!editingId} minLength={editingId && !password ? undefined : 8} type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder={editingId ? 'New password (optional)' : 'Assign password (8+ chars)'} className="rounded-lg border border-stone-200 px-3 py-2 text-xs" />
-          <input required={!editingId} type="number" min="0" max="100" value={doctorScore} onChange={event => setDoctorScore(event.target.value)} placeholder={editingId ? 'Doctor initial score /100' : 'Initial distress score /100 *'} className="rounded-lg border border-stone-200 px-3 py-2 text-xs" />
+          <input required={!editingId} type="number" min="0" max="100" value={doctorScore} onChange={event => setDoctorScore(event.target.value)} placeholder={editingId ? 'Initial stress level /100' : 'Initial stress level /100 *'} className="rounded-lg border border-stone-200 px-3 py-2 text-xs" />
           <input value={doctorName} onChange={event => setDoctorName(event.target.value)} placeholder="Doctor / assessor" className="rounded-lg border border-stone-200 px-3 py-2 text-xs" />
           <input value={telegramUsername} onChange={event => setTelegramUsername(event.target.value)} placeholder="Telegram username (without @)" className="rounded-lg border border-stone-200 px-3 py-2 text-xs" />
           <input value={doctorNotes} onChange={event => setDoctorNotes(event.target.value)} placeholder="Initial clinical note" className="rounded-lg border border-stone-200 px-3 py-2 text-xs sm:col-span-2" />
@@ -101,7 +103,7 @@ export const OfficialsVictimManager: React.FC<OfficialsVictimManagerProps> = ({ 
             <div className="flex justify-end"><button type="button" onClick={() => startEdit(victim)} className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2 py-1 text-[10px] font-semibold text-stone-600 hover:bg-stone-100"><Pencil className="h-3 w-3" /> Edit</button></div>
             <div className="text-xs font-semibold text-stone-900">{victim.name}</div>
             <div className="mt-1 font-mono text-[10px] text-stone-500">{victim.id} · {victim.case_id}</div>
-            <div className="mt-2 text-[10px] text-stone-600">Initial {victim.doctor_initial_score ?? victim.baseline_distress_score}/100 · Current {victim.latest_score}/100 · {victim.risk_level}</div>
+            <div className="mt-2 text-[10px] text-stone-600">Initial stress {victim.doctor_initial_score ?? victim.baseline_distress_score}/100 · Current stress {victim.latest_score}/100 · {victim.risk_level}</div>
             {victim.closed && <div className="mt-1 text-[10px] font-semibold text-stone-500">Case closed</div>}
           </div>
         ))}

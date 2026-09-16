@@ -51,6 +51,11 @@ export async function executeBackendPipeline(
   const isolatedHistory = await db.getIsolatedConversations(victimId, 10);
   const distressHistory = await db.getDistressHistory(victimId);
 
+  // Durable cross-channel history.
+  // This includes Telegram, Victim Dashboard and other persisted check-ins.
+  // Only this victim's records are loaded.
+  const historicalCheckins = await db.getCheckinsForVictim(victimId, 12);
+
   // =========================================================================
   // 2. Pre-filter & Sanitize Input
   // =========================================================================
@@ -85,40 +90,87 @@ export async function executeBackendPipeline(
         }
       });
 
-      // Prepare strictly isolated conversation turns for this victim
       const priorTurnsSnippet = isolatedHistory.length > 0
-        ? isolatedHistory.map((t, idx) => `Turn ${idx + 1} (${t.timestamp}): [${t.role.toUpperCase()}] ${t.sanitizedMessage} (Distress: ${t.distressScore})`).join('\n')
-        : 'No prior recorded turns for this isolated victim.';
+        ? isolatedHistory
+            .map(
+              (t, idx) =>
+                `Conversation ${idx + 1} (${t.timestamp}) [${t.channel.toUpperCase()}]: ` +
+                `${t.sanitizedMessage} ` +
+                `(previous stress estimate: ${t.distressScore}/100)`
+            )
+            .join('\n')
+        : 'No prior conversation turns available.';
 
-      const systemPrompt = `You are the AI Engine of an Atrocity Victim Mental Health Monitoring and Distress Prediction pipeline.
-You analyze incoming periodic checks, text disclosures, voice transcripts, or external trauma events.
+      const priorCheckinsSnippet = historicalCheckins.length > 0
+        ? historicalCheckins
+            .map(
+              (c, idx) =>
+                `Check-in ${idx + 1} (${c.created_at}) ` +
+                `[${(c.ingestion_channel || 'unknown').toUpperCase()}]: ` +
+                `${c.message} ` +
+                `(previous stress estimate: ${c.score}/100; risk: ${c.risk_category})`
+            )
+            .join('\n')
+        : 'No prior cross-channel check-ins available.';
 
-CRITICAL ISOLATION MANDATE:
-You are strictly evaluating ONLY victim ${victimId} (${victimProfile.pseudonym}).
-Do NOT blend or reference any other victim context.
+      const systemPrompt = `You are the CareBridge AI stress-analysis engine.
 
-DATABASE BACKGROUND OF THIS VICTIM:
-- Trauma context: ${victimProfile.traumaContext}
-- Baseline distress: ${victimProfile.baselineDistressScore}
-- Assigned Caseworker: ${victimProfile.assignedCaseworker}
-- Safety Notes: ${victimProfile.safetyNotes || 'None'}
+You analyze ONE registered victim at a time across:
+- Victim Dashboard chatbot
+- Telegram
+- WhatsApp
+- IVR
+- Speech transcripts
 
-ISOLATED PRIOR CONVERSATION TURNS:
+Never mix information from another victim.
+
+Your output is an evidence-based STRESS ESTIMATE, NOT a medical diagnosis.
+
+STRESS SCORE SCALE:
+0-24   = Minimal
+25-49  = Mild
+50-74  = Elevated / High
+75-100 = Severe / Critical
+
+SCORING RULES:
+1. Analyze the CURRENT disclosure carefully.
+2. Use the victim's previous check-ins to identify change over time.
+3. Previous scores are context, NOT the answer.
+4. Do NOT simply copy the previous score.
+5. Look for explicit emotional language, anxiety, fear, sleep problems,
+   intrusive memories, avoidance, hopelessness, panic, agitation,
+   functional impairment and safety/crisis indicators.
+6. Do not infer stress from demographic characteristics.
+7. Compare against this victim's own baseline.
+8. If evidence is weak or ambiguous, keep the estimate conservative
+   and mention uncertainty.
+9. Explicit immediate-danger or self-harm/violence indicators should
+   strongly increase the stress estimate and urgency.
+
+DATABASE BACKGROUND:
+- Victim: ${victimProfile.pseudonym}
+- Baseline stress: ${victimProfile.baselineDistressScore}/100
+
+PREVIOUS CONVERSATION HISTORY:
 ${priorTurnsSnippet}
 
-Evaluate the incoming input according to:
-1. NLP linguistic trauma markers & categories
-2. Emotion Analysis (primary emotion, arousal level 0-100, emotional valence)
-3. Modality Analysis (${modality.toUpperCase()} signals)
-4. Dynamic Trauma Severity (0-100) & Resilience Score (0-100)`;
+PREVIOUS CROSS-CHANNEL CHECK-IN HISTORY:
+${priorCheckinsSnippet}
 
-      const prompt = `MODALITY: ${modality.toUpperCase()}
+Evaluate the CURRENT input using the above evidence.`;
+
+      const prompt = `CURRENT INPUT
+MODALITY: ${modality.toUpperCase()}
 CHECK TYPE: ${checkType.toUpperCase()}
-SANITIZED INPUT:
+
 """
 ${filterResult.filteredText}
 """
-CRISIS FLAGS: ${filterResult.crisisDetection.reasons.join('; ') || 'None'}`;
+
+CRISIS FLAGS:
+${filterResult.crisisDetection.reasons.join('; ') || 'None'}
+
+Return the structured assessment JSON.`;
 
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('AI Engine timeout (7s)')), 7000)
