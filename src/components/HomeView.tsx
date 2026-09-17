@@ -1,5 +1,6 @@
 import React from 'react';
 import { Activity, ArrowRight, Heart, LayoutDashboard } from 'lucide-react';
+import TranslatedText from './TranslatedText';
 
 export type AppSection = 'victimDashboard' | 'officialsDashboard';
 
@@ -9,6 +10,7 @@ interface HomeViewProps {
 
 const destinations: Array<{
   section: AppSection;
+  titleKey: string;
   title: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -16,6 +18,7 @@ const destinations: Array<{
 }> = [
   {
     section: 'victimDashboard',
+    titleKey: 'victimDashboard',
     title: 'Victim Dashboard',
     description: 'Open a private, trauma-informed space for check-ins, grounding support, wellbeing status, and assigned care.',
     icon: Heart,
@@ -23,6 +26,7 @@ const destinations: Array<{
   },
   {
     section: 'officialsDashboard',
+    titleKey: 'officialsDashboard',
     title: 'Officials Dashboard',
     description: 'Review sanitized triage records, risk levels, escalation signals, and recommended intervention protocols.',
     icon: LayoutDashboard,
@@ -41,10 +45,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
             CareBridge
           </div>
           <h2 className="max-w-2xl text-3xl font-semibold tracking-tight text-stone-900 sm:text-5xl">
-            Trauma-informed signals, routed to the people who can help.
+            <TranslatedText>
+              Trauma-informed signals, routed to the people who can help.
+            </TranslatedText>
           </h2>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-stone-500 sm:text-base">
-            Choose the protected CareBridge dashboard that matches your role.
+            <TranslatedText>
+              Choose the protected CareBridge dashboard that matches your role.
+            </TranslatedText>
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <button
@@ -52,7 +60,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
               onClick={() => onNavigate('victimDashboard')}
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition-colors hover:bg-emerald-400"
             >
-              Enter Victim Dashboard
+              <TranslatedText>
+                Enter Victim Dashboard
+              </TranslatedText>
               <ArrowRight className="h-4 w-4" />
             </button>
             <button
@@ -60,7 +70,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
               onClick={() => onNavigate('officialsDashboard')}
               className="inline-flex items-center gap-2 rounded-lg border border-stone-700 px-4 py-2.5 text-sm font-semibold text-stone-200 transition-colors hover:border-stone-500 hover:bg-stone-50"
             >
-              Enter Officials Dashboard
+              <TranslatedText>
+                Enter Officials Dashboard
+              </TranslatedText>
             </button>
           </div>
         </div>
@@ -80,8 +92,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
               </span>
               <ArrowRight className="h-4 w-4 text-stone-400 transition-transform group-hover:translate-x-1 group-hover:text-stone-300" />
             </div>
-            <h3 className="mt-5 text-sm font-semibold text-stone-900">{title}</h3>
-            <p className="mt-2 text-xs leading-6 text-stone-500">{description}</p>
+            <h3 className="mt-5 text-sm font-semibold text-stone-900"><TranslatedText>{title}</TranslatedText></h3>
+            <p className="mt-2 text-xs leading-6 text-stone-500"><TranslatedText>{description}</TranslatedText></p>
           </button>
         ))}
       </div>

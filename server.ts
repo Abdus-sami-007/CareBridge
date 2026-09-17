@@ -593,6 +593,64 @@ async function startServer() {
     }
   });
 
+  // 1.5 Real-time UI Translation Endpoint
+  app.post('/api/translate', async (req, res) => {
+    try {
+      const { targetLanguage, texts } = req.body;
+      if (!Array.isArray(texts) || texts.length === 0 || !targetLanguage || targetLanguage === 'en') {
+        res.json({ translations: Array.isArray(texts) ? texts : [] });
+        return;
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
+        try {
+          const ai = new GoogleGenAI({
+            apiKey,
+            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+          });
+          const prompt = `Translate the following UI text strings into target language code "${targetLanguage}".
+Do not translate brand names like "CareBridge" or technical codes/IDs.
+Return JSON matching: { "translations": string[] } with exact same array length and order.
+
+TEXTS TO TRANSLATE:
+${JSON.stringify(texts, null, 2)}`;
+
+          const aiPromise = ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  translations: { type: Type.ARRAY, items: { type: Type.STRING } }
+                },
+                required: ['translations']
+              }
+            }
+          });
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Translation timeout')), 5000)
+          );
+          const response: any = await Promise.race([aiPromise, timeoutPromise]);
+          if (response.text) {
+            const parsed = JSON.parse(response.text.trim());
+            if (Array.isArray(parsed.translations) && parsed.translations.length === texts.length) {
+              res.json({ translations: parsed.translations });
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('[Translate API] Fallback due to AI error:', err);
+        }
+      }
+      res.json({ translations: texts });
+    } catch {
+      res.json({ translations: req.body?.texts || [] });
+    }
+  });
+
   // 2. Generic Ingestion Endpoint
   app.post('/api/ingest', async (req, res) => {
     try {

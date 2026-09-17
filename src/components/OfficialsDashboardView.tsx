@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { TranslatedText } from './TranslatedText';
 import {
   OfficialsDashboardPayload,
   IngestionChannel
@@ -79,28 +80,28 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
         return (
           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200 animate-pulse">
             <AlertOctagon className="w-3 h-3 text-rose-600" />
-            <span>CRITICAL RED</span>
+            <span><TranslatedText>CRITICAL RED</TranslatedText></span>
           </span>
         );
       case 'ELEVATED_AMBER':
         return (
           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-900 border border-amber-200">
             <AlertTriangle className="w-3 h-3 text-amber-700" />
-            <span>ELEVATED AMBER</span>
+            <span><TranslatedText>ELEVATED AMBER</TranslatedText></span>
           </span>
         );
       case 'MONITOR_YELLOW':
         return (
           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-yellow-100 text-yellow-900 border border-yellow-200">
             <Clock className="w-3 h-3 text-yellow-700" />
-            <span>MONITOR YELLOW</span>
+            <span><TranslatedText>MONITOR YELLOW</TranslatedText></span>
           </span>
         );
       default:
         return (
           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-            <span>STABLE GREEN</span>
+            <span><TranslatedText>STABLE GREEN</TranslatedText></span>
           </span>
         );
     }
@@ -131,13 +132,13 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
               <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-semibold">
                 REST Endpoint: GET /api/dashboards/officials
               </span>
-              <span className="text-xs text-stone-500 font-mono">Live Clinician &amp; Responders Feed</span>
+              <span className="text-xs text-stone-500 font-mono"><TranslatedText>Live Clinician & Responders Feed</TranslatedText></span>
             </div>
             <h3 className="text-base font-semibold text-stone-900 mt-1">
-              Officials &amp; Authorities Triage Dashboard
+              <TranslatedText>Officials & Authorities Triage Dashboard</TranslatedText>
             </h3>
             <p className="text-xs text-stone-500">
-              Real-time sanitized triage cases from multi-channel inputs (WhatsApp, Telegram, IVR, Speech, Web)
+              <TranslatedText>Real-time sanitized triage cases from multi-channel inputs (WhatsApp, Telegram, IVR, Speech, Web)</TranslatedText>
             </p>
           </div>
 
@@ -147,7 +148,7 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-stone-200 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied Officials JSON' : 'Export Officials Feed (JSON)'}</span>
+              <span><TranslatedText>{copied ? 'Copied Officials JSON' : 'Export Officials Feed (JSON)'}</TranslatedText></span>
             </button>
           </div>
         </div>
@@ -155,39 +156,39 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
         {/* Analysis & operational statistics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="rounded-xl border border-sky-200 bg-sky-50 p-3.5">
-            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-sky-700">Monitored victims</span><Users className="h-4 w-4 text-sky-600" /></div>
+            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-sky-700"><TranslatedText>Monitored victims</TranslatedText></span><Users className="h-4 w-4 text-sky-600" /></div>
             <div className="mt-1 text-2xl font-bold text-sky-950">{monitoredVictims}</div>
-            <div className="text-[10px] text-sky-700">Unique database cases</div>
+            <div className="text-[10px] text-sky-700"><TranslatedText>Unique database cases</TranslatedText></div>
           </div>
           <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3.5">
-            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Avg distress</span><Activity className="h-4 w-4 text-indigo-600" /></div>
+            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700"><TranslatedText>Avg distress</TranslatedText></span><Activity className="h-4 w-4 text-indigo-600" /></div>
             <div className="mt-1 text-2xl font-bold text-indigo-950">{averageDistress}<span className="text-xs font-normal">/100</span></div>
-            <div className="text-[10px] text-indigo-700">Across stored check-ins</div>
+            <div className="text-[10px] text-indigo-700"><TranslatedText>Across stored check-ins</TranslatedText></div>
           </div>
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5">
-            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">Priority cases</span><ShieldAlert className="h-4 w-4 text-rose-600" /></div>
+            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-rose-700"><TranslatedText>Priority cases</TranslatedText></span><ShieldAlert className="h-4 w-4 text-rose-600" /></div>
             <div className="mt-1 text-2xl font-bold text-rose-950">{highRiskShare}%</div>
-            <div className="text-[10px] text-rose-700">High + critical check-ins</div>
+            <div className="text-[10px] text-rose-700"><TranslatedText>High + critical check-ins</TranslatedText></div>
           </div>
           <div className="rounded-xl border border-stone-200 bg-stone-50 p-3.5">
-            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-stone-600">Stored assessments</span><BarChart3 className="h-4 w-4 text-stone-600" /></div>
+            <div className="flex items-center justify-between"><span className="text-[10px] font-semibold uppercase tracking-wider text-stone-600"><TranslatedText>Stored assessments</TranslatedText></span><BarChart3 className="h-4 w-4 text-stone-600" /></div>
             <div className="mt-1 text-2xl font-bold text-stone-900">{records.length}</div>
-            <div className="text-[10px] text-stone-600">Real PostgreSQL check-ins</div>
+            <div className="text-[10px] text-stone-600"><TranslatedText>Real PostgreSQL check-ins</TranslatedText></div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-            <div className="mb-3 flex items-center justify-between"><div><h4 className="text-xs font-semibold text-stone-900">Risk distribution</h4><p className="text-[10px] text-stone-500">Current database check-in classification</p></div><BarChart3 className="h-4 w-4 text-stone-500" /></div>
+            <div className="mb-3 flex items-center justify-between"><div><h4 className="text-xs font-semibold text-stone-900"><TranslatedText>Risk distribution</TranslatedText></h4><p className="text-[10px] text-stone-500"><TranslatedText>Current database check-in classification</TranslatedText></p></div><BarChart3 className="h-4 w-4 text-stone-500" /></div>
             {[['Critical', criticalCount, records.length ? criticalCount / records.length : 0, 'bg-rose-500'], ['High', amberCount, records.length ? amberCount / records.length : 0, 'bg-amber-500'], ['Medium', yellowCount, records.length ? yellowCount / records.length : 0, 'bg-yellow-500'], ['Low', greenCount, records.length ? greenCount / records.length : 0, 'bg-emerald-500']].map(([label, count, ratio, bar]) => (
               <div key={String(label)} className="mb-2 last:mb-0">
-                <div className="mb-1 flex justify-between text-[10px] text-stone-600"><span>{label}</span><span className="font-mono font-semibold">{count}</span></div>
+                <div className="mb-1 flex justify-between text-[10px] text-stone-600"><span><TranslatedText>{String(label)}</TranslatedText></span><span className="font-mono font-semibold">{count}</span></div>
                 <div className="h-2 overflow-hidden rounded-full bg-stone-200"><div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.max(Number(ratio) * 100, count ? 3 : 0)}%` }} /></div>
               </div>
             ))}
           </div>
           <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-            <div className="mb-3 flex items-center justify-between"><div><h4 className="text-xs font-semibold text-stone-900">Recent distress analysis</h4><p className="text-[10px] text-stone-500">Latest stored assessments, oldest → newest</p></div><TrendingUp className="h-4 w-4 text-stone-500" /></div>
+            <div className="mb-3 flex items-center justify-between"><div><h4 className="text-xs font-semibold text-stone-900"><TranslatedText>Recent distress analysis</TranslatedText></h4><p className="text-[10px] text-stone-500"><TranslatedText>Latest stored assessments, oldest → newest</TranslatedText></p></div><TrendingUp className="h-4 w-4 text-stone-500" /></div>
             {sortedRecent.length ? (
               <div className="flex h-28 items-end gap-2">
                 {sortedRecent.map((record, index) => { const value = Math.max(0, Math.min(100, Number(record.distressPredictionScore || 0))); return <div key={`${record.recordId}-${index}`} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`${record.victimId}: ${value}/100`}>
@@ -196,34 +197,34 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
                   <span className="max-w-full truncate text-[9px] font-mono text-stone-500">{record.victimId}</span>
                 </div> })}
               </div>
-            ) : <div className="flex h-28 items-center justify-center text-xs text-stone-400">No database assessments yet.</div>}
+            ) : <div className="flex h-28 items-center justify-center text-xs text-stone-400"><TranslatedText>No database assessments yet.</TranslatedText></div>}
           </div>
         </div>
 
         {/* Triage Priority Metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
           <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200">
-            <div className="text-[11px] font-semibold text-rose-700 uppercase tracking-wider">Critical Red</div>
+            <div className="text-[11px] font-semibold text-rose-700 uppercase tracking-wider"><TranslatedText>Critical Red</TranslatedText></div>
             <div className="text-2xl font-bold text-rose-900 mt-0.5">{criticalCount}</div>
-            <div className="text-[11px] text-rose-600 mt-1">Immediate Crisis Dispatch</div>
+            <div className="text-[11px] text-rose-600 mt-1"><TranslatedText>Immediate Crisis Dispatch</TranslatedText></div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200">
-            <div className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider">Elevated Amber</div>
+            <div className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider"><TranslatedText>Elevated Amber</TranslatedText></div>
             <div className="text-2xl font-bold text-amber-900 mt-0.5">{amberCount}</div>
-            <div className="text-[11px] text-amber-700 mt-1">Caseworker 2h Outreach</div>
+            <div className="text-[11px] text-amber-700 mt-1"><TranslatedText>Caseworker 2h Outreach</TranslatedText></div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-yellow-50 border border-yellow-200">
-            <div className="text-[11px] font-semibold text-yellow-800 uppercase tracking-wider">Monitor Yellow</div>
+            <div className="text-[11px] font-semibold text-yellow-800 uppercase tracking-wider"><TranslatedText>Monitor Yellow</TranslatedText></div>
             <div className="text-2xl font-bold text-yellow-900 mt-0.5">{yellowCount}</div>
-            <div className="text-[11px] text-yellow-700 mt-1">Scheduled Trauma Care</div>
+            <div className="text-[11px] text-yellow-700 mt-1"><TranslatedText>Scheduled Trauma Care</TranslatedText></div>
           </div>
 
           <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
-            <div className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider">Stable Green</div>
+            <div className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider"><TranslatedText>Stable Green</TranslatedText></div>
             <div className="text-2xl font-bold text-emerald-900 mt-0.5">{greenCount}</div>
-            <div className="text-[11px] text-emerald-700 mt-1">Self-Care &amp; Community</div>
+            <div className="text-[11px] text-emerald-700 mt-1"><TranslatedText>Self-Care & Community</TranslatedText></div>
           </div>
         </div>
       </div>
@@ -234,15 +235,15 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
         <div className="lg:col-span-7 bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden flex flex-col">
           <div className="p-4 border-b border-stone-200 flex items-center justify-between bg-stone-50/50">
             <h4 className="text-xs font-semibold text-stone-900 uppercase tracking-wider">
-              Ingested Atrocity Cases ({records.length})
+              <TranslatedText>Ingested Atrocity Cases</TranslatedText> ({records.length})
             </h4>
-            <span className="text-[11px] text-stone-500 font-mono">Sorted by Priority &amp; Time</span>
+            <span className="text-[11px] text-stone-500 font-mono"><TranslatedText>Sorted by Priority & Time</TranslatedText></span>
           </div>
 
           <div className="divide-y divide-stone-200 max-h-[600px] overflow-y-auto">
             {records.length === 0 ? (
               <div className="p-8 text-center text-xs text-stone-500">
-                No processed cases are available yet. Submit a real check-in through the pipeline to populate this queue.
+                <TranslatedText>No processed cases are available yet. Submit a real check-in through the pipeline to populate this queue.</TranslatedText>
               </div>
             ) : records.map((rec) => {
               const isSelected = selectedRecord?.recordId === rec.recordId;
@@ -267,17 +268,17 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
                     </div>
 
                     <div className="text-xs font-medium text-stone-900">
-                      {rec.atrocityType}
+                      <TranslatedText>{rec.atrocityType}</TranslatedText>
                     </div>
 
                     <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">
-                      "{rec.sanitizedNarrative}"
+                      "<TranslatedText>{rec.sanitizedNarrative}</TranslatedText>"
                     </p>
 
                     <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-stone-500">
-                      <span>Severity: <strong>{rec.traumaSeverityScore}/100</strong></span>
-                      <span>Distress: <strong>{rec.distressPredictionScore}/100</strong></span>
-                      <span>Redacted: <strong>{rec.redactedTokensCount} PII</strong></span>
+                      <span><TranslatedText>Severity</TranslatedText>: <strong>{rec.traumaSeverityScore}/100</strong></span>
+                      <span><TranslatedText>Distress</TranslatedText>: <strong>{rec.distressPredictionScore}/100</strong></span>
+                      <span><TranslatedText>Redacted</TranslatedText>: <strong>{rec.redactedTokensCount} <TranslatedText>PII</TranslatedText></strong></span>
                       <span>{new Date(rec.ingestedAt).toLocaleTimeString()}</span>
                     </div>
                   </div>
@@ -296,7 +297,7 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
               <div className="flex items-center justify-between border-b border-stone-200 pb-3">
                 <div>
                   <span className="text-[10px] font-mono text-stone-400 uppercase tracking-wider">
-                    Detailed Case Protocol
+                    <TranslatedText>Detailed Case Protocol</TranslatedText>
                   </span>
                   <h4 className="text-sm font-bold text-stone-900 mt-0.5 flex items-center gap-2">
                     <span>{selectedRecord.victimId}</span>
@@ -321,19 +322,19 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
                     className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
                     title="Close case"
                   >
-                    <XCircle className="h-3.5 w-3.5" /> Close case
+                    <XCircle className="h-3.5 w-3.5" /> <TranslatedText>Close case</TranslatedText>
                   </button>
                 </div>
               </div>
 
               {caseAnalysis && (
                 <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3.5 space-y-3">
-                  <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Longitudinal case analysis</div><div className="text-[10px] text-stone-500">Doctor baseline compared with this victim's saved check-ins</div></div><span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-indigo-700">{caseAnalysis.summary.direction}</span></div>
+                  <div className="flex items-center justify-between"><div><div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700"><TranslatedText>Longitudinal case analysis</TranslatedText></div><div className="text-[10px] text-stone-500"><TranslatedText>Doctor baseline compared with this victim's saved check-ins</TranslatedText></div></div><span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-indigo-700"><TranslatedText>{caseAnalysis.summary.direction}</TranslatedText></span></div>
                   <div className="grid grid-cols-4 gap-2">
-                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500">Baseline</div><div className="text-sm font-bold">{caseAnalysis.summary.baselineScore ?? caseAnalysis.victim.baseline_distress_score}</div></div>
-                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500">Latest</div><div className="text-sm font-bold">{caseAnalysis.summary.latestScore}</div></div>
-                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500">Average</div><div className="text-sm font-bold">{caseAnalysis.summary.averageScore}</div></div>
-                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500">Check-ins</div><div className="text-sm font-bold">{caseAnalysis.summary.checkinCount}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500"><TranslatedText>Baseline</TranslatedText></div><div className="text-sm font-bold">{caseAnalysis.summary.baselineScore ?? caseAnalysis.victim.baseline_distress_score}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500"><TranslatedText>Latest</TranslatedText></div><div className="text-sm font-bold">{caseAnalysis.summary.latestScore}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500"><TranslatedText>Average</TranslatedText></div><div className="text-sm font-bold">{caseAnalysis.summary.averageScore}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[9px] text-stone-500"><TranslatedText>Check-ins</TranslatedText></div><div className="text-sm font-bold">{caseAnalysis.summary.checkinCount}</div></div>
                   </div>
                   <div className="flex h-20 items-end gap-1">{caseAnalysis.history.slice(-10).map((h:any)=><div key={h.id} className="flex-1 h-full flex items-end" title={`${h.score}/100`}><div className="w-full rounded-t bg-indigo-500" style={{height:`${Math.max(5, Number(h.score))}%`}} /></div>)}</div>
                 </div>
@@ -342,21 +343,21 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
               {/* Recommended Official Protocol */}
               <div className="p-3.5 rounded-xl bg-stone-900 text-white space-y-1.5">
                 <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-semibold">
-                  Official Action Directive
+                  <TranslatedText>Official Action Directive</TranslatedText>
                 </div>
                 <div className="text-xs leading-relaxed font-medium">
-                  {selectedRecord.recommendedOfficialProtocol}
+                  <TranslatedText>{selectedRecord.recommendedOfficialProtocol}</TranslatedText>
                 </div>
                 <div className="text-[11px] text-stone-400 pt-1 flex items-center justify-between">
-                  <span>Assigned: {selectedRecord.assignedAgency}</span>
-                  <span className="text-emerald-400">Escalation: {selectedRecord.escalationRisk}</span>
+                  <span><TranslatedText>Assigned</TranslatedText>: <TranslatedText>{selectedRecord.assignedAgency}</TranslatedText></span>
+                  <span className="text-emerald-400"><TranslatedText>Escalation</TranslatedText>: <TranslatedText>{selectedRecord.escalationRisk}</TranslatedText></span>
                 </div>
               </div>
 
               {/* Scores Grid */}
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-200">
-                  <div className="text-[10px] uppercase tracking-wider text-stone-500">Trauma Severity</div>
+                  <div className="text-[10px] uppercase tracking-wider text-stone-500"><TranslatedText>Trauma Severity</TranslatedText></div>
                   <div className="text-lg font-bold text-stone-900 mt-0.5">
                     {selectedRecord.traumaSeverityScore}
                     <span className="text-xs font-normal text-stone-400">/100</span>
@@ -364,7 +365,7 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-200">
-                  <div className="text-[10px] uppercase tracking-wider text-stone-500">Distress Predict</div>
+                  <div className="text-[10px] uppercase tracking-wider text-stone-500"><TranslatedText>Distress Predict</TranslatedText></div>
                   <div className="text-lg font-bold text-stone-900 mt-0.5">
                     {selectedRecord.distressPredictionScore}
                     <span className="text-xs font-normal text-stone-400">/100</span>
@@ -372,7 +373,7 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-200">
-                  <div className="text-[10px] uppercase tracking-wider text-stone-500">Resilience Index</div>
+                  <div className="text-[10px] uppercase tracking-wider text-stone-500"><TranslatedText>Resilience Index</TranslatedText></div>
                   <div className="text-lg font-bold text-emerald-700 mt-0.5">
                     {selectedRecord.resilienceScore}
                     <span className="text-xs font-normal text-stone-400">/100</span>
@@ -383,27 +384,27 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
               {/* Sanitized Narrative */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-stone-700">
-                  <span>Sanitized Evidence Narrative</span>
+                  <span><TranslatedText>Sanitized Evidence Narrative</TranslatedText></span>
                   <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    {selectedRecord.redactedTokensCount} Identifiers Protected
+                    {selectedRecord.redactedTokensCount} <TranslatedText>Identifiers Protected</TranslatedText>
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-stone-50 border border-stone-200 text-xs text-stone-800 leading-relaxed font-sans max-h-40 overflow-y-auto">
-                  {selectedRecord.sanitizedNarrative}
+                  <TranslatedText>{selectedRecord.sanitizedNarrative}</TranslatedText>
                 </div>
               </div>
 
               {/* Audit Timeline */}
               <div className="space-y-2 pt-1 border-t border-stone-100">
-                <div className="text-xs font-semibold text-stone-700">Audit &amp; Processing Trail</div>
+                <div className="text-xs font-semibold text-stone-700"><TranslatedText>Audit & Processing Trail</TranslatedText></div>
                 <div className="space-y-1.5 text-xs">
                   {selectedRecord.timeline.map((item, idx) => (
                     <div key={idx} className="flex items-start space-x-2 text-[11px] text-stone-600">
                       <div className="w-1.5 h-1.5 rounded-full bg-stone-400 mt-1.5 shrink-0" />
                       <div className="flex-1">
-                        <span className="font-medium text-stone-800">{item.action}</span>
+                        <span className="font-medium text-stone-800"><TranslatedText>{item.action}</TranslatedText></span>
                         <div className="text-stone-400 font-mono text-[10px]">
-                          {item.actor} &bull; {new Date(item.timestamp).toLocaleTimeString()}
+                          <TranslatedText>{item.actor}</TranslatedText> &bull; {new Date(item.timestamp).toLocaleTimeString()}
                         </div>
                       </div>
                     </div>
@@ -413,7 +414,7 @@ export const OfficialsDashboardView: React.FC<OfficialsDashboardViewProps> = ({
             </>
           ) : (
             <div className="h-64 flex items-center justify-center text-xs text-stone-400">
-              Select a triage record to inspect action protocols
+              <TranslatedText>Select a triage record to inspect action protocols</TranslatedText>
             </div>
           )}
         </div>
