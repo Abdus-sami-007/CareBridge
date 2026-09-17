@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { I18nProvider, useI18n } from './i18n';
+import LanguageSelector from './components/LanguageSelector';
 import { PipelineFlowchartDiagram } from './components/PipelineFlowchartDiagram';
 import { IsolatedVictimInspector } from './components/IsolatedVictimInspector';
 import { PipelineExecutionRunner } from './components/PipelineExecutionRunner';
@@ -24,7 +26,8 @@ import {
   Database as DatabaseIcon
 } from 'lucide-react';
 
-export default function App() {
+function AppContent() {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<AppSection | 'home'>('victimDashboard');
   const [selectedVictimId, setSelectedVictimId] = useState<string>('');
   const [lastExecutionResult, setLastExecutionResult] = useState<PipelineExecutionResult | null>(null);
@@ -233,6 +236,8 @@ async function fetchJson<T>(
               <Sparkles className="w-3 h-3 text-sky-400" />
               <span>Gemini 3.8 Flash</span>
             </div>
+
+            <LanguageSelector />
           </div>
         </div>
 
@@ -244,21 +249,21 @@ async function fetchJson<T>(
               onClick={() => setActiveTab('home')}
               className={`border-b-2 px-3.5 py-2 font-semibold ${activeTab === 'home' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
             >
-              Home
+              {t('home', 'Home')}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('victimDashboard')}
               className={`border-b-2 px-3.5 py-2 font-semibold ${activeTab === 'victimDashboard' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
             >
-              Victim Dashboard
+              {t('victimDashboard', 'Victim Dashboard')}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('officialsDashboard')}
               className={`border-b-2 px-3.5 py-2 font-semibold ${activeTab === 'officialsDashboard' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
             >
-              Officials Dashboard
+              {t('officialsDashboard', 'Officials Dashboard')}
             </button>
           </div>
         </div>
@@ -316,7 +321,7 @@ async function fetchJson<T>(
             {!officialSession ? <OfficialsAccessGate onAuthenticated={setOfficialSession} /> : <>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-white px-4 py-3 shadow-sm">
                 <div><div className="text-xs font-semibold">Signed in as {officialSession.display_name}</div><div className="text-[10px] text-stone-500">@{officialSession.username} · {officialSession.role === 'admin' ? 'Administrator' : 'Sub-official'}</div></div>
-                <button onClick={async()=>{await fetch('/api/official-auth/logout',{method:'POST',headers:{Authorization:`Bearer ${officialSession.token}`}});setOfficialSession(null);setOfficialsRecords([])}} className="rounded-xl border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700">Log out</button>
+                <button onClick={async()=>{await fetch('/api/official-auth/logout',{method:'POST',headers:{Authorization:`Bearer ${officialSession.token}`}});setOfficialSession(null);setOfficialsRecords([])}} className="rounded-xl border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700">{t('logout', 'Log out')}</button>
               </div>
               {officialSession.role === 'admin' && <OfficialsAccountManager token={officialSession.token} isAdmin={true} />}
               <OfficialsVictimManager victims={victims} canManageVictims={true} authToken={officialSession.token} onSaved={() => { loadVictims(); loadDashboardData(); }} />
@@ -331,5 +336,13 @@ async function fetchJson<T>(
         CareBridge &bull; AI-powered early intervention &bull; Protected victim support
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <I18nProvider>
+      <AppContent />
+    </I18nProvider>
   );
 }

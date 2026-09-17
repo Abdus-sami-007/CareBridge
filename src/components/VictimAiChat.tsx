@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bot, Send, ShieldCheck, User, Mic, MicOff, Volume2 } from 'lucide-react';
 import { PipelineExecutionResult } from '../types';
+import { useI18n } from '../i18n';
 
 interface VictimAiChatProps {
   victimId: string;
@@ -14,6 +15,7 @@ interface ChatMessage {
 }
 
 export const VictimAiChat: React.FC<VictimAiChatProps> = ({ victimId, onCompleted }) => {
+  const { t, language } = useI18n();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -120,7 +122,8 @@ export const VictimAiChat: React.FC<VictimAiChatProps> = ({ victimId, onComplete
           modality,
           checkType: 'direct_input',
           input: text,
-          channel: 'victim_dashboard'
+          channel: 'victim_dashboard',
+          language
         })
       });
       const result: PipelineExecutionResult = await response.json();
@@ -151,8 +154,8 @@ export const VictimAiChat: React.FC<VictimAiChatProps> = ({ victimId, onComplete
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-emerald-600 p-2 text-white"><Bot className="h-5 w-5" /></div>
           <div>
-            <h3 className="text-sm font-semibold text-stone-900">CareBridge AI Check-in</h3>
-            <p className="text-[11px] text-stone-500">Private conversation for {victimId}</p>
+            <h3 className="text-sm font-semibold text-stone-900">{t('careBridgeCheckin', 'CareBridge AI Check-in')}</h3>
+            <p className="text-[11px] text-stone-500">{t('privateConversationFor', 'Private conversation for')} {victimId}</p>
           </div>
         </div>
         <ShieldCheck className="h-5 w-5 text-emerald-600" />
@@ -161,7 +164,7 @@ export const VictimAiChat: React.FC<VictimAiChatProps> = ({ victimId, onComplete
       <div className="max-h-72 space-y-3 overflow-y-auto bg-stone-50 p-4">
         {messages.length === 0 && (
           <div className="rounded-xl border border-dashed border-stone-300 bg-white p-5 text-center text-xs leading-5 text-stone-500">
-            {historyLoading ? 'Loading your saved check-ins…' : 'Tell CareBridge how you are feeling. Your message will be screened, scored, and saved to your database record.'}
+            {historyLoading ? t('loading', 'Loading...') : 'Tell CareBridge how you are feeling. Your message will be screened, scored, and saved to your database record.'}
           </div>
         )}
         {messages.map((message, index) => (
@@ -169,7 +172,7 @@ export const VictimAiChat: React.FC<VictimAiChatProps> = ({ victimId, onComplete
             {message.role === 'ai' && <Bot className="mt-2 h-4 w-4 shrink-0 text-emerald-600" />}
             <div className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-xs leading-5 ${message.role === 'victim' ? 'bg-stone-900 text-white' : 'border border-emerald-100 bg-white text-stone-700'}`}>
               {message.text}
-              {message.score !== undefined && <div className="mt-2 border-t border-stone-200 pt-1 text-[10px] font-mono text-emerald-700">Recorded distress score: {message.score}/100</div>}
+              {message.score !== undefined && <div className="mt-2 border-t border-stone-200 pt-1 text-[10px] font-mono text-emerald-700">{t('stressScore', 'AI-Estimated Stress Score')}: {message.score}/100</div>}
             </div>
             {message.role === 'victim' && <User className="mt-2 h-4 w-4 shrink-0 text-stone-500" />}
           </div>
@@ -182,19 +185,19 @@ export const VictimAiChat: React.FC<VictimAiChatProps> = ({ victimId, onComplete
         <input
           value={input}
           onChange={event => { setInput(event.target.value); setInputModality('text'); }}
-          placeholder={isListening ? 'Listening… speak naturally' : 'Write a private check-in…'}
+          placeholder={isListening ? t('listening', 'Listening… speak naturally') : t('writePrivateCheckin', 'Write a private check-in…')}
           className="min-w-0 flex-1 rounded-xl border border-stone-200 px-3 py-2.5 text-xs text-stone-800 outline-none focus:border-emerald-500"
           disabled={isSending}
         />
-        <button type="button" onClick={() => { if (isListening) return; setInputModality('voice'); startVoiceChat(); }} disabled={isSending || !voiceSupported} title={voiceSupported ? 'Speak your check-in' : 'Voice input unavailable'} className={`inline-flex items-center justify-center rounded-xl px-3 py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${isListening ? 'bg-rose-600 text-white' : 'bg-sky-100 text-sky-800 hover:bg-sky-200'}`}>
+        <button type="button" onClick={() => { if (isListening) return; setInputModality('voice'); startVoiceChat(); }} disabled={isSending || !voiceSupported} title={voiceSupported ? t('speakCheckin', 'Speak your check-in') : t('voiceUnavailable', 'Voice input unavailable')} className={`inline-flex items-center justify-center rounded-xl px-3 py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${isListening ? 'bg-rose-600 text-white' : 'bg-sky-100 text-sky-800 hover:bg-sky-200'}`}>
           {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
         </button>
         <button type="submit" disabled={isSending || !input.trim()} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
           <Send className="h-3.5 w-3.5" />
-          {isSending ? 'Sending' : 'Send'}
+          {isSending ? t('sending', 'Sending') : t('send', 'Send')}
         </button>
         {messages.some(m => m.role === 'ai') && (
-          <button type="button" onClick={() => { const last = [...messages].reverse().find(m => m.role === 'ai'); if (last) speakReply(last.text); }} disabled={isSpeaking} title="Read latest response aloud" className="inline-flex items-center justify-center rounded-xl border border-stone-200 px-3 py-2.5 text-stone-600 hover:bg-stone-50 disabled:opacity-50">
+          <button type="button" onClick={() => { const last = [...messages].reverse().find(m => m.role === 'ai'); if (last) speakReply(last.text); }} disabled={isSpeaking} title={t('readAloud', 'Read latest response aloud')} className="inline-flex items-center justify-center rounded-xl border border-stone-200 px-3 py-2.5 text-stone-600 hover:bg-stone-50 disabled:opacity-50">
             <Volume2 className="h-4 w-4" />
           </button>
         )}

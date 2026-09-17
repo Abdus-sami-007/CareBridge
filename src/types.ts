@@ -317,6 +317,7 @@ export interface PipelineProcessPayload {
     impactSummary?: string;
   };
   channel?: IngestionChannel;
+  language?: string;
 }
 
 export interface PipelineExecutionResult {

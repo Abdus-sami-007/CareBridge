@@ -113,6 +113,8 @@ export async function executeBackendPipeline(
             .join('\n')
         : 'No prior cross-channel check-ins available.';
 
+      const selectedLanguage = payload.language || payload.eventData?.eventType || 'en';
+
       const systemPrompt = `You are the CareBridge AI stress-analysis engine.
 
 You analyze ONE registered victim at a time across:
@@ -125,6 +127,11 @@ You analyze ONE registered victim at a time across:
 Never mix information from another victim.
 
 Your output is an evidence-based STRESS ESTIMATE, NOT a medical diagnosis.
+
+LANGUAGE INSTRUCTION:
+Respond user-facing text/summaries in the user's selected language (${selectedLanguage}).
+Do not switch to English unless requested.
+The stress score calculation should remain standard (0-100). Only the language of text explanations changes.
 
 STRESS SCORE SCALE:
 0-24   = Minimal

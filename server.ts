@@ -196,6 +196,8 @@ async function processDisclosure(
             .join('\n')
         : 'No previous check-ins are available for this victim.';
 
+      const selectedLang = channelMetadata.language || 'en';
+
       const systemPrompt = `You are the CareBridge AI stress-analysis engine.
 
 You analyze one registered victim across multiple channels:
@@ -206,6 +208,11 @@ The input has already been sanitized.
 NEVER mix information from another victim.
 
 Your output is an evidence-based stress estimate, NOT a medical diagnosis.
+
+PREFERRED LANGUAGE INSTRUCTION:
+Provide empathetic summaries and victim feedback messages in the victim's selected language (${selectedLang}).
+Do not switch to English unless requested.
+Score calculations remain on standard 0-100 scales.
 
 STRESS SCORE:
 0-24   = Minimal
