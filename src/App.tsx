@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { I18nProvider, useI18n } from './i18n';
 import LanguageSelector from './components/LanguageSelector';
+import { TranslatedText } from './components/TranslatedText';
 import { PipelineFlowchartDiagram } from './components/PipelineFlowchartDiagram';
 import { IsolatedVictimInspector } from './components/IsolatedVictimInspector';
 import { PipelineExecutionRunner } from './components/PipelineExecutionRunner';
@@ -206,11 +207,11 @@ async function fetchJson<T>(
                   CareBridge
                 </h1>
                 <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-mono bg-stone-100 text-stone-600 border border-stone-200">
-                  Mental Health Monitoring
+                  <TranslatedText>Mental Health Monitoring</TranslatedText>
                 </span>
               </div>
               <p className="text-[11px] text-stone-500">
-                AI-powered early intervention and victim support platform
+                <TranslatedText>AI-powered early intervention and victim support platform</TranslatedText>
               </p>
             </div>
           </div>
@@ -219,17 +220,17 @@ async function fetchJson<T>(
           <div className="flex items-center gap-2 text-xs font-mono">
             <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200 text-stone-600">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Service: {serverMeta?.status === 'ok' ? 'Online' : 'Checking'}</span>
+              <span><TranslatedText>Service</TranslatedText>: <TranslatedText>{serverMeta?.status === 'ok' ? 'Online' : 'Checking'}</TranslatedText></span>
             </div>
 
             <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
               <Lock className="w-3 h-3 text-emerald-700" />
-              <span>Isolation: Enforced</span>
+              <span><TranslatedText>Isolation: Enforced</TranslatedText></span>
             </div>
 
             <div className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border ${serverMeta?.database?.connected ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
               <DatabaseIcon className="w-3 h-3" />
-              <span>DB: {serverMeta?.database?.connected ? 'Connected' : serverMeta?.database?.configured ? 'Connection error' : 'Not configured'}</span>
+              <span><TranslatedText>{serverMeta?.database?.connected ? 'DB: Connected' : serverMeta?.database?.configured ? 'DB: Connection error' : 'DB: Not configured'}</TranslatedText></span>
             </div>
 
             <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-800">
@@ -249,21 +250,21 @@ async function fetchJson<T>(
               onClick={() => setActiveTab('home')}
               className={`border-b-2 px-3.5 py-2 font-semibold ${activeTab === 'home' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
             >
-              {t('home', 'Home')}
+              <TranslatedText>Home</TranslatedText>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('victimDashboard')}
               className={`border-b-2 px-3.5 py-2 font-semibold ${activeTab === 'victimDashboard' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
             >
-              {t('victimDashboard', 'Victim Dashboard')}
+              <TranslatedText>Victim Dashboard</TranslatedText>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('officialsDashboard')}
               className={`border-b-2 px-3.5 py-2 font-semibold ${activeTab === 'officialsDashboard' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
             >
-              {t('officialsDashboard', 'Officials Dashboard')}
+              <TranslatedText>Officials Dashboard</TranslatedText>
             </button>
           </div>
         </div>
@@ -281,8 +282,8 @@ async function fetchJson<T>(
         {activeTab !== 'home' && (
           <div className="rounded-xl border border-stone-200 bg-white p-3.5 text-xs text-stone-600">
             {authenticatedVictimId
-              ? <>Live records for <strong>{authenticatedVictimId}</strong> are read from the configured database. New check-ins are persisted by the pipeline.</>
-              : <>Victim ID is intentionally blank until the victim signs in. No case is selected automatically.</>}
+              ? <><TranslatedText>Live records for</TranslatedText> <strong>{authenticatedVictimId}</strong> <TranslatedText>are read from the configured database. New check-ins are persisted by the pipeline.</TranslatedText></>
+              : <><TranslatedText>Victim ID is intentionally blank until the victim signs in. No case is selected automatically.</TranslatedText></>}
           </div>
         )}
 

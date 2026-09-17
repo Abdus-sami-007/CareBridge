@@ -593,7 +593,7 @@ async function startServer() {
     }
   });
 
-  // 1.5 Real-time UI Translation Endpoint
+  // 1.5 Real-time UI Translation Endpoint (OpenAI, Gemini, and Free GT Fallback)
   app.post('/api/translate', async (req, res) => {
     try {
       const { targetLanguage, texts } = req.body;
@@ -602,11 +602,54 @@ async function startServer() {
         return;
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
+      const openaiKey = process.env.OPENAI_API_KEY;
+      const geminiKey = process.env.GEMINI_API_KEY;
+
+      // Method 1: OpenAI API if OPENAI_API_KEY is present
+      if (openaiKey && openaiKey !== 'MY_OPENAI_API_KEY') {
+        try {
+          const prompt = `Translate the following UI text strings into target language code "${targetLanguage}".
+Do not translate brand names like "CareBridge" or technical codes/IDs.
+Return ONLY valid JSON matching: { "translations": string[] } with exact same array length and order.
+
+TEXTS TO TRANSLATE:
+${JSON.stringify(texts, null, 2)}`;
+
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openaiKey}`
+            },
+            body: JSON.stringify({
+              model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+              messages: [{ role: 'user', content: prompt }],
+              response_format: { type: 'json_object' },
+              temperature: 0.2
+            })
+          });
+
+          if (response.ok) {
+            const data: any = await response.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (content) {
+              const parsed = JSON.parse(content.trim());
+              if (Array.isArray(parsed.translations) && parsed.translations.length === texts.length) {
+                res.json({ translations: parsed.translations });
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[Translate API] OpenAI translation failed, falling back:', err);
+        }
+      }
+
+      // Method 2: Gemini API if GEMINI_API_KEY is present
+      if (geminiKey && geminiKey !== 'MY_GEMINI_API_KEY') {
         try {
           const ai = new GoogleGenAI({
-            apiKey,
+            apiKey: geminiKey,
             httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
           });
           const prompt = `Translate the following UI text strings into target language code "${targetLanguage}".
@@ -642,9 +685,35 @@ ${JSON.stringify(texts, null, 2)}`;
             }
           }
         } catch (err) {
-          console.warn('[Translate API] Fallback due to AI error:', err);
+          console.warn('[Translate API] Gemini translation failed, falling back:', err);
         }
       }
+
+      // Method 3: High-reliability MyMemory Free Translation API Fallback (Zero Config)
+      try {
+        const translatedList: string[] = await Promise.all(
+          texts.map(async (txt: string) => {
+            if (!txt || !txt.trim()) return txt;
+            try {
+              const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt)}&langpair=en|${encodeURIComponent(targetLanguage)}`;
+              const response = await fetch(url);
+              if (!response.ok) return txt;
+              const data: any = await response.json();
+              if (data?.responseData?.translatedText) {
+                return data.responseData.translatedText;
+              }
+              return txt;
+            } catch {
+              return txt;
+            }
+          })
+        );
+        res.json({ translations: translatedList });
+        return;
+      } catch (err) {
+        console.warn('[Translate API] MyMemory translation fallback failed:', err);
+      }
+
       res.json({ translations: texts });
     } catch {
       res.json({ translations: req.body?.texts || [] });
