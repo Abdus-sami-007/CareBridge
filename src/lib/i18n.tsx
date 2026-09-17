@@ -23,11 +23,20 @@ export async function translateUI(
   text: string,
   language: LanguageCode
 ): Promise<string> {
-  if (!text || language === 'en') return text;
+  if (!text || !text.trim() || language === 'en') return text;
 
-  const cached = translatedCache.get(`${language}|${text}`);
-  if (cached) return cached;
+  const cleanText = text.trim();
 
+  // 1. Check static dictionary
+  if (translations[language]?.[cleanText]) {
+    return translations[language][cleanText];
+  }
+
+  // 2. Check memory cache
+  const cached = translatedCache.get(`${language}|${cleanText}`);
+  if (cached && cached !== cleanText) return cached;
+
+  // 3. Try backend API /api/translate
   try {
     const response = await fetch('/api/translate', {
       method: 'POST',
@@ -37,22 +46,42 @@ export async function translateUI(
       },
       body: JSON.stringify({
         targetLanguage: language,
-        texts: [text],
+        texts: [cleanText],
       }),
     });
 
-    if (!response.ok) return text;
+    if (response.ok) {
+      const data = await response.json();
+      const translated = data.translations?.[0];
 
-    const data = await response.json();
-
-    const translated = data.translations?.[0] || text;
-
-    translatedCache.set(`${language}|${text}`, translated);
-
-    return translated;
-  } catch {
-    return text;
+      if (translated && translated.trim() !== cleanText) {
+        translatedCache.set(`${language}|${cleanText}`, translated);
+        return translated;
+      }
+    }
+  } catch (err) {
+    console.warn('[i18n] Backend translate call failed, trying client fallback:', err);
   }
+
+  // 4. Browser direct Google Translate GTX fallback (works 100% in browser CORS)
+  try {
+    const gtxUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(language)}&dt=t&q=${encodeURIComponent(cleanText)}`;
+    const gtxRes = await fetch(gtxUrl);
+    if (gtxRes.ok) {
+      const gtxData = await gtxRes.json();
+      if (Array.isArray(gtxData) && Array.isArray(gtxData[0])) {
+        const clientTranslated = gtxData[0].map((part: any) => part[0]).join('');
+        if (clientTranslated && clientTranslated.trim() !== cleanText) {
+          translatedCache.set(`${language}|${cleanText}`, clientTranslated);
+          return clientTranslated;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[i18n] Client GTX translate fallback error:', err);
+  }
+
+  return text;
 }
 
 type I18nContextType = {

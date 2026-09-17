@@ -57,11 +57,37 @@ export const translations: Record<
     isolationEnforced: "Isolation: Enforced",
   },
 
-  as: {},
-  bn: {},
+  as: {
+    "Home": "গৃহ",
+    "Victim Dashboard": "ভুক্তভোগী ডেচব'ৰ্ড",
+    "Officials Dashboard": "বিষয়াসকলৰ ডেচব'ৰ্ড"
+  },
+  bn: {
+    "Home": "হোম",
+    "Victim Dashboard": "ভিকটিম ড্যাশবোর্ড",
+    "Officials Dashboard": "অফিসিয়াল ড্যাশবোর্ড",
+    "Mental Health Monitoring": "মানসিক স্বাস্থ্য পর্যবেক্ষণ",
+    "AI-powered early intervention and victim support platform": "এআই-চালিত প্রাথমিক হস্তক্ষেপ এবং ভিকটিম সহায়তা প্ল্যাটফর্ম",
+    "Service": "পরিষেবা",
+    "Isolation: Enforced": "আইসোলেশন: বলবৎ",
+    "Private Victim Access": "ব্যক্তিগত ভিকটিম অ্যাক্সেস",
+    "Enter Victim Dashboard": "ভিকটিম ড্যাশবোর্ডে প্রবেশ করুন",
+    "Officials Secure Login": "অফিসিয়াল সুরক্ষিত লগইন",
+    "Enter Officials Dashboard": "অফিসিয়াল ড্যাশবোর্ডে প্রবেশ করুন"
+  },
   brx: {},
   doi: {},
-  gu: {},
+  gu: {
+    "Home": "હોમ",
+    "Victim Dashboard": "પીડિત ડેશબોર્ડ",
+    "Officials Dashboard": "અધિકારી ડેશબોર્ડ",
+    "Mental Health Monitoring": "માનસિક સ્વાસ્થ્ય દેખરેખ",
+    "Service": "સેવા",
+    "Isolation: Enforced": "અલગતા: અમલી",
+    "Private Victim Access": "ખાનગી પીડિત એક્સેસ",
+    "Enter Victim Dashboard": "પીડિત ડેશબોર્ડમાં પ્રવેશ કરો",
+    "Officials Secure Login": "અધિકારી સુરક્ષિત લોગિન"
+  },
   hi: {
     appName: "CareBridge",
     login: "लॉगिन",
@@ -105,6 +131,23 @@ export const translations: Record<
     home: "मुख्य पृष्ठ",
     victimDashboard: "पीड़ित डैशबोर्ड",
     officialsDashboard: "अधिकारी डैशबोर्ड",
+
+    "Home": "होम",
+    "Victim Dashboard": "पीड़ित डैशबोर्ड",
+    "Officials Dashboard": "अधिकारी डैशबोर्ड",
+    "Mental Health Monitoring": "मानसिक स्वास्थ्य निगरानी",
+    "AI-powered early intervention and victim support platform": "एआई-संचालित त्वरित सहायता एवं पीड़ित सहायता मंच",
+    "Service": "सेवा",
+    "Isolation: Enforced": "अलगाव: लागू",
+    "Private Victim Access": "निजी पीड़ित पहुंच",
+    "Enter your assigned case credentials to continue.": "जारी रखने के लिए अपने आवंटित केस क्रेडेंशियल दर्ज करें।",
+    "Enter Victim Dashboard": "पीड़ित डैशबोर्ड में प्रवेश करें",
+    "Officials Secure Login": "अधिकारी सुरक्षित लॉगिन",
+    "Sign in with an official account stored in PostgreSQL.": "PostgreSQL में संग्रहीत आधिकारिक खाते से साइन इन करें।",
+    "Sign in to Officials Dashboard": "अधिकारी डैशबोर्ड में साइन इन करें",
+    "Enter Officials Dashboard": "अधिकारी डैशबोर्ड में प्रवेश करें",
+    "Trauma-informed signals, routed to the people who can help.": "आघात-सूचित संकेत, उन लोगों तक पहुंचाए गए जो मदद कर सकते हैं।",
+    "Choose the protected CareBridge dashboard that matches your role.": "अपनी भूमिका से मेल खाने वाला सुरक्षित CareBridge डैशबोर्ड चुनें।"
   },
   kn: {},
   ks: {},
@@ -112,14 +155,44 @@ export const translations: Record<
   mai: {},
   ml: {},
   mni: {},
-  mr: {},
+  mr: {
+    "Home": "होम",
+    "Victim Dashboard": "पीड़ित डॅशबोर्ड",
+    "Officials Dashboard": "अधिकारी डॅशबोर्ड",
+    "Mental Health Monitoring": "मानसिक आरोग्य देखरेख",
+    "Service": "सेवा",
+    "Isolation: Enforced": "विलगीकरण: लागू",
+    "Private Victim Access": "खाजगी पीड़ित प्रवेश",
+    "Enter Victim Dashboard": "पीड़ित डॅशबोर्डवर जा",
+    "Officials Secure Login": "अधिकारी सुरक्षित लॉगिन"
+  },
   ne: {},
   or: {},
   pa: {},
   sa: {},
   sat: {},
   sd: {},
-  ta: {},
-  te: {},
-  ur: {},
+  ta: {
+    "Home": "முகப்பு",
+    "Victim Dashboard": "பாதிக்கப்பட்டவர் டேஷ்போர்டு",
+    "Officials Dashboard": "அதிகாரிகள் டேஷ்போர்டு",
+    "Mental Health Monitoring": "மனநல கண்காணிப்பு",
+    "Service": "சேவை",
+    "Private Victim Access": "தனியார் அணுகல்",
+    "Enter Victim Dashboard": "டேஷ்போர்டில் நுழைக"
+  },
+  te: {
+    "Home": "హోమ్",
+    "Victim Dashboard": "బాధితుల డాష్‌బోర్డ్",
+    "Officials Dashboard": "అధికారుల డాష్‌బోర్డ్",
+    "Mental Health Monitoring": "మానసిక ఆరోగ్య పర్యవేక్షణ",
+    "Service": "సేవ"
+  },
+  ur: {
+    "Home": "ہوم",
+    "Victim Dashboard": "متاثرہ ڈیش بورڈ",
+    "Officials Dashboard": "حکام ڈیش بورڈ",
+    "Mental Health Monitoring": "ذہنی صحت کی نگرانی",
+    "Service": "سروس"
+  }
 };
