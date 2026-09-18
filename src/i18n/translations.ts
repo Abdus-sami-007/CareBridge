@@ -12,14 +12,11 @@ export const translations: Record<
     official: "Official",
     dashboard: "Dashboard",
     language: "Language",
-
     welcome: "Welcome to CareBridge",
     victimLogin: "Victim Login",
     officialLogin: "Official Login",
-
     victimId: "Victim ID",
     password: "Password",
-
     chatbot: "AI Chatbot",
     send: "Send",
     sending: "Sending",
@@ -31,25 +28,20 @@ export const translations: Record<
     readAloud: "Read latest response aloud",
     careBridgeCheckin: "CareBridge AI Check-in",
     privateConversationFor: "Private conversation for",
-
     stressScore: "AI-Estimated Stress Score",
     riskLevel: "Risk Level",
     history: "History",
     currentStatus: "Current Status",
-
     addVictim: "Add Victim",
     editVictim: "Edit Victim",
     save: "Save",
     cancel: "Cancel",
     closeCase: "Close Case",
-
     loading: "Loading...",
     error: "Something went wrong.",
-
     voiceInput: "Voice Input",
     startRecording: "Start Recording",
     stopRecording: "Stop Recording",
-
     home: "Home",
     victimDashboard: "Victim Dashboard",
     officialsDashboard: "Officials Dashboard",
@@ -60,8 +52,13 @@ export const translations: Record<
   as: {
     "Home": "গৃহ",
     "Victim Dashboard": "ভুক্তভোগী ডেচব'ৰ্ড",
-    "Officials Dashboard": "বিষয়াসকলৰ ডেচব'ৰ্ড"
+    "Officials Dashboard": "বিষয়াসকলৰ ডেচব'ৰ্ড",
+    "Mental Health Monitoring": "মানসিক স্বাস্থ্য নিৰীক্ষণ",
+    "Service": "সেৱা",
+    "Login": "লগইন",
+    "Logout": "লগআউট"
   },
+  
   bn: {
     "Home": "হোম",
     "Victim Dashboard": "ভিকটিম ড্যাশবোর্ড",
@@ -73,10 +70,27 @@ export const translations: Record<
     "Private Victim Access": "ব্যক্তিগত ভিকটিম অ্যাক্সেস",
     "Enter Victim Dashboard": "ভিকটিম ড্যাশবোর্ডে প্রবেশ করুন",
     "Officials Secure Login": "অফিসিয়াল সুরক্ষিত লগইন",
-    "Enter Officials Dashboard": "অফিসিয়াল ড্যাশবোর্ডে প্রবেশ করুন"
+    "Enter Officials Dashboard": "অফিসিয়াল ড্যাশবোর্ডে প্রবেশ করুন",
+    "Login": "লগইন",
+    "Logout": "লগআউট"
   },
-  brx: {},
-  doi: {},
+  
+  brx: {
+    "Home": "न'",
+    "Victim Dashboard": "भुगिनाय ड्यासबर्ड",
+    "Officials Dashboard": "मावखियारि ड्यासबर्ड",
+    "Login": "लगइन",
+    "Logout": "लगाउट"
+  },
+  
+  doi: {
+    "Home": "घर",
+    "Victim Dashboard": "पीड़ित डैशबोर्ड",
+    "Officials Dashboard": "अधिकारी डैशबोर्ड",
+    "Login": "लागिन",
+    "Logout": "लागआउट"
+  },
+  
   gu: {
     "Home": "હોમ",
     "Victim Dashboard": "પીડિત ડેશબોર્ડ",
@@ -86,8 +100,11 @@ export const translations: Record<
     "Isolation: Enforced": "અલગતા: અમલી",
     "Private Victim Access": "ખાનગી પીડિત એક્સેસ",
     "Enter Victim Dashboard": "પીડિત ડેશબોર્ડમાં પ્રવેશ કરો",
-    "Officials Secure Login": "અધિકારી સુરક્ષિત લોગિન"
+    "Officials Secure Login": "અધિકારી સુરક્ષિત લોગિન",
+    "Login": "લૉગિન",
+    "Logout": "લૉગઆઉટ"
   },
+  
   hi: {
     appName: "CareBridge",
     login: "लॉगिन",
@@ -96,42 +113,33 @@ export const translations: Record<
     official: "अधिकारी",
     dashboard: "डैशबोर्ड",
     language: "भाषा",
-
     welcome: "CareBridge में आपका स्वागत है",
     victimLogin: "पीड़ित लॉगिन",
     officialLogin: "अधिकारी लॉगिन",
-
     victimId: "पीड़ित आईडी",
     password: "पासवर्ड",
-
     chatbot: "एआई चैटबॉट",
     send: "भेजें",
     sending: "भेजा जा रहा है",
     typeMessage: "अपना संदेश लिखें...",
     writePrivateCheckin: "एक निजी चेक-इन लिखें...",
-
     stressScore: "एआई-अनुमानित तनाव स्कोर",
     riskLevel: "जोखिम स्तर",
     history: "इतिहास",
     currentStatus: "वर्तमान स्थिति",
-
     addVictim: "पीड़ित जोड़ें",
     editVictim: "पीड़ित संपादित करें",
     save: "सहेजें",
     cancel: "रद्द करें",
     closeCase: "मामला बंद करें",
-
     loading: "लोड हो रहा है...",
     error: "कुछ गलत हो गया।",
-
     voiceInput: "वॉयस इनपुट",
     startRecording: "रिकॉर्डिंग शुरू करें",
     stopRecording: "रिकॉर्डिंग रोकें",
-
     home: "मुख्य पृष्ठ",
     victimDashboard: "पीड़ित डैशबोर्ड",
     officialsDashboard: "अधिकारी डैशबोर्ड",
-
     "Home": "होम",
     "Victim Dashboard": "पीड़ित डैशबोर्ड",
     "Officials Dashboard": "अधिकारी डैशबोर्ड",
@@ -149,29 +157,125 @@ export const translations: Record<
     "Trauma-informed signals, routed to the people who can help.": "आघात-सूचित संकेत, उन लोगों तक पहुंचाए गए जो मदद कर सकते हैं।",
     "Choose the protected CareBridge dashboard that matches your role.": "अपनी भूमिका से मेल खाने वाला सुरक्षित CareBridge डैशबोर्ड चुनें।"
   },
-  kn: {},
-  ks: {},
-  kok: {},
-  mai: {},
-  ml: {},
-  mni: {},
+  
+  kn: {
+    "Home": "ಮುಖಪುಟ",
+    "Victim Dashboard": "ಸಂತ್ರಸ್ತರ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+    "Officials Dashboard": "ಅಧಿಕಾರಿಗಳ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+    "Mental Health Monitoring": "ಮಾನಸಿಕ ಆರೋಗ್ಯ ಮೇಲ್ವಿಚಾರಣೆ",
+    "Service": "ಸೇವೆ",
+    "Login": "ಲಾಗಿನ್",
+    "Logout": "ಲಾಗ್ಔಟ್"
+  },
+  
+  ks: {
+    "Home": "گھر",
+    "Victim Dashboard": "متاثرہ ڈیش بورڈ",
+    "Officials Dashboard": "آفیشلز ڈیش بورڈ",
+    "Login": "لاگ ان",
+    "Logout": "لاگ آؤٹ"
+  },
+  
+  kok: {
+    "Home": "मुखेल पान",
+    "Victim Dashboard": "पिडित डॅशबोर्ड",
+    "Officials Dashboard": "अधिकारी डॅशबोर्ड",
+    "Login": "लॉगिन",
+    "Logout": "लॉगआउट"
+  },
+  
+  mai: {
+    "Home": "मुख्य पृष्ठ",
+    "Victim Dashboard": "पीड़ित डैशबोर्ड",
+    "Officials Dashboard": "अधिकारी डैशबोर्ड",
+    "Login": "लॉगिन",
+    "Logout": "लॉगआउट"
+  },
+  
+  ml: {
+    "Home": "ഹോം",
+    "Victim Dashboard": "ഇരയുടെ ഡാഷ്ബോർഡ്",
+    "Officials Dashboard": "ഉദ്യോഗസ്ഥരുടെ ഡാഷ്ബോർഡ്",
+    "Mental Health Monitoring": "മാനസികാരോഗ്യ നിരീക്ഷണം",
+    "Service": "സേവനം",
+    "Login": "ലോഗിൻ",
+    "Logout": "ലോഗൗട്ട്"
+  },
+  
+  mni: {
+    "Home": "मयूम",
+    "Victim Dashboard": "ভিকটিম ড্যাশবোর্ড",
+    "Officials Dashboard": "ওফিসিয়েল ড্যাশবোর্ড",
+    "Login": "লগইন",
+    "Logout": "লগআউট"
+  },
+  
   mr: {
-    "Home": "होम",
-    "Victim Dashboard": "पीड़ित डॅशबोर्ड",
+    "Home": "मुख्यपृष्ठ",
+    "Victim Dashboard": "पीडित डॅशबोर्ड",
     "Officials Dashboard": "अधिकारी डॅशबोर्ड",
     "Mental Health Monitoring": "मानसिक आरोग्य देखरेख",
     "Service": "सेवा",
     "Isolation: Enforced": "विलगीकरण: लागू",
-    "Private Victim Access": "खाजगी पीड़ित प्रवेश",
-    "Enter Victim Dashboard": "पीड़ित डॅशबोर्डवर जा",
-    "Officials Secure Login": "अधिकारी सुरक्षित लॉगिन"
+    "Private Victim Access": "खाजगी पीडित प्रवेश",
+    "Enter Victim Dashboard": "पीडित डॅशबोर्डवर जा",
+    "Officials Secure Login": "अधिकारी सुरक्षित लॉगिन",
+    "Login": "लॉगिन",
+    "Logout": "लॉगआउट"
   },
-  ne: {},
-  or: {},
-  pa: {},
-  sa: {},
-  sat: {},
-  sd: {},
+  
+  ne: {
+    "Home": "गृहपृष्ठ",
+    "Victim Dashboard": "पीडित ड्यासबोर्ड",
+    "Officials Dashboard": "अधिकारी ड्यासबोर्ड",
+    "Login": "लगइन",
+    "Logout": "लगआउट"
+  },
+  
+  or: {
+    "Home": "ହୋମ୍",
+    "Victim Dashboard": "ପୀଡିତ ଡ୍ୟାସବୋର୍ଡ",
+    "Officials Dashboard": "ଅଧିକାରୀ ଡ୍ୟାସବୋର୍ଡ",
+    "Mental Health Monitoring": "ମାନସିକ ସ୍ୱାସ୍ଥ୍ୟ ନୀରିକ୍ଷଣ",
+    "Service": "ସେବା",
+    "Login": "ଲଗଇନ୍",
+    "Logout": "ଲଗଆଉଟ୍"
+  },
+  
+  pa: {
+    "Home": "ਮੁੱਖ ਪੰਨਾ",
+    "Victim Dashboard": "ਪੀੜਤ ਡੈਸ਼ਬੋਰਡ",
+    "Officials Dashboard": "ਅਧਿਕਾਰੀ ਡੈਸ਼ਬੋਰਡ",
+    "Mental Health Monitoring": "ਮਾਨਸਿਕ ਸਿਹਤ ਨਿਗਰਾਨੀ",
+    "Service": "ਸੇਵਾ",
+    "Login": "ਲਾਗਇਨ",
+    "Logout": "ਲਾਗਆਉਟ"
+  },
+  
+  sa: {
+    "Home": "गृहम्",
+    "Victim Dashboard": "पीडित-फलकम्",
+    "Officials Dashboard": "अधिकारि-फलकम्",
+    "Login": "प्रवेशः",
+    "Logout": "निर्गमः"
+  },
+  
+  sat: {
+    "Home": "ᱚᱲᱟᱜ",
+    "Victim Dashboard": "ᱵᱤᱠᱴᱤᱢ ᱰᱮᱥᱵᱚᱨᱰ",
+    "Officials Dashboard": "ᱚᱯᱷᱤᱥᱤᱭᱟᱞ ᱰᱮᱥᱵᱚᱨᱰ",
+    "Login": "ᱞᱚᱜᱤᱱ",
+    "Logout": "ᱞᱚᱜᱟᱩᱴ"
+  },
+  
+  sd: {
+    "Home": "گھر",
+    "Victim Dashboard": "متاثرہ ڊيش بورڊ",
+    "Officials Dashboard": "آفیشلز ڊيش بورڊ",
+    "Login": "لاگ ان",
+    "Logout": "لاگ آئوٽ"
+  },
+  
   ta: {
     "Home": "முகப்பு",
     "Victim Dashboard": "பாதிக்கப்பட்டவர் டேஷ்போர்டு",
@@ -179,20 +283,28 @@ export const translations: Record<
     "Mental Health Monitoring": "மனநல கண்காணிப்பு",
     "Service": "சேவை",
     "Private Victim Access": "தனியார் அணுகல்",
-    "Enter Victim Dashboard": "டேஷ்போர்டில் நுழைக"
+    "Enter Victim Dashboard": "டேஷ்போர்டில் நுழைக",
+    "Login": "உள்நுழை",
+    "Logout": "வெளியேறு"
   },
+  
   te: {
     "Home": "హోమ్",
     "Victim Dashboard": "బాధితుల డాష్‌బోర్డ్",
     "Officials Dashboard": "అధికారుల డాష్‌బోర్డ్",
     "Mental Health Monitoring": "మానసిక ఆరోగ్య పర్యవేక్షణ",
-    "Service": "సేవ"
+    "Service": "సేవ",
+    "Login": "లాగిన్",
+    "Logout": "లాగ్అవుట్"
   },
+  
   ur: {
     "Home": "ہوم",
     "Victim Dashboard": "متاثرہ ڈیش بورڈ",
     "Officials Dashboard": "حکام ڈیش بورڈ",
     "Mental Health Monitoring": "ذہنی صحت کی نگرانی",
-    "Service": "سروس"
+    "Service": "سروس",
+    "Login": "لاگ ان",
+    "Logout": "لاگ آؤٹ"
   }
 };
